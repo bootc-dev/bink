@@ -1,16 +1,20 @@
 package helpers
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/podman"
 	. "github.com/onsi/gomega"
 )
 
 // SSHExec executes a command on a node via SSH through the container
 func SSHExec(clusterName, nodeName, command string) string {
-	// Build container name with cluster prefix if not default
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
 	var containerName string
 	if clusterName != "" && clusterName != "podman" {
 		containerName = fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
@@ -18,15 +22,11 @@ func SSHExec(clusterName, nodeName, command string) string {
 		containerName = fmt.Sprintf("k8s-%s", nodeName)
 	}
 
-	// Build SSH command to run inside the container
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /var/run/cluster/cluster.key -p 2222 core@localhost '%s'", command)
 
-	// Execute via podman exec
-	cmd := exec.Command("podman", "exec", containerName, "sh", "-c", sshCmd)
-	output, err := cmd.CombinedOutput()
+	output, err := podmanClient.ContainerExec(ctx, containerName, []string{"sh", "-c", sshCmd})
 
-	// Filter out SSH warnings
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(output, "\n")
 	var filtered []string
 	for _, line := range lines {
 		if !strings.Contains(line, "Warning:") {
@@ -42,7 +42,12 @@ func SSHExec(clusterName, nodeName, command string) string {
 // SSHExecQuiet executes a command but doesn't fail on errors
 // Returns output and error
 func SSHExecQuiet(clusterName, nodeName, command string) (string, error) {
-	// Build container name with cluster prefix if not default
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		return "", err
+	}
+
 	var containerName string
 	if clusterName != "" && clusterName != "podman" {
 		containerName = fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
@@ -52,11 +57,9 @@ func SSHExecQuiet(clusterName, nodeName, command string) (string, error) {
 
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /var/run/cluster/cluster.key -p 2222 core@localhost '%s'", command)
 
-	cmd := exec.Command("podman", "exec", containerName, "sh", "-c", sshCmd)
-	output, err := cmd.CombinedOutput()
+	output, err := podmanClient.ContainerExec(ctx, containerName, []string{"sh", "-c", sshCmd})
 
-	// Filter out SSH warnings
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(output, "\n")
 	var filtered []string
 	for _, line := range lines {
 		if !strings.Contains(line, "Warning:") {

@@ -13,6 +13,7 @@ import (
 	"github.com/containers/podman/v6/pkg/api/handlers"
 	"github.com/containers/podman/v6/pkg/bindings"
 	"github.com/containers/podman/v6/pkg/bindings/containers"
+	"github.com/containers/podman/v6/pkg/bindings/images"
 	"github.com/containers/podman/v6/pkg/bindings/network"
 	"github.com/containers/podman/v6/pkg/bindings/volumes"
 	"github.com/containers/podman/v6/pkg/domain/entities"
@@ -519,6 +520,46 @@ func (c *Client) VolumeCreate(ctx context.Context, name string) error {
 
 	logrus.Infof("Volume '%s' created successfully", name)
 	return nil
+}
+
+func (c *Client) VolumeList(ctx context.Context, filter string) ([]string, error) {
+	if err := c.ensureConnection(); err != nil {
+		return nil, err
+	}
+
+	opts := new(volumes.ListOptions)
+	if filter != "" {
+		parts := strings.SplitN(filter, "=", 2)
+		if len(parts) == 2 {
+			opts.WithFilters(map[string][]string{
+				parts[0]: {parts[1]},
+			})
+		}
+	}
+
+	volumeList, err := volumes.List(c.conn, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(volumeList))
+	for _, vol := range volumeList {
+		names = append(names, vol.Name)
+	}
+
+	return names, nil
+}
+
+func (c *Client) ImageExists(ctx context.Context, name string) (bool, error) {
+	if err := c.ensureConnection(); err != nil {
+		return false, err
+	}
+
+	exists, err := images.Exists(c.conn, name, nil)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (c *Client) ContainerWait(ctx context.Context, name string) (int64, error) {

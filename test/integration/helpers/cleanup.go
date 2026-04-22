@@ -1,10 +1,11 @@
 package helpers
 
 import (
+	"context"
 	"os"
-	"os/exec"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/podman"
 	. "github.com/onsi/gomega"
 )
 
@@ -23,50 +24,43 @@ func RequireBink() {
 
 // RequireImage verifies that a container image exists
 func RequireImage(image string) {
-	cmd := exec.Command("podman", "image", "exists", image)
-	err := cmd.Run()
-	Expect(err).ToNot(HaveOccurred(), "Image %s not found. Run 'make build-cluster-image' and 'make build-images-container'", image)
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
+	exists, err := podmanClient.ImageExists(context.Background(), image)
+	Expect(err).ToNot(HaveOccurred(), "Failed to check image existence")
+	Expect(exists).To(BeTrue(), "Image %s not found. Run 'make build-cluster-image' and 'make build-images-container'", image)
 }
 
 // CleanupAllTestClusters removes all test clusters (containers with label bink.cluster-name=test-bink-*)
 func CleanupAllTestClusters() {
-	// List all containers with bink.cluster-name label
-	cmd := exec.Command("podman", "ps", "-a", "--filter", "label=bink.cluster-name", "--format", "{{.Names}}\t{{.Labels}}")
-	output, err := cmd.CombinedOutput()
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
 	if err != nil {
-		// Ignore errors - may be no containers
 		return
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		// Extract container name (first field)
-		parts := strings.SplitN(line, "\t", 2)
-		if len(parts) < 2 {
-			continue
-		}
-		name := parts[0]
-		labels := parts[1]
+	containerNames, err := podmanClient.ContainerList(ctx, "label=bink.cluster-name")
+	if err != nil {
+		return
+	}
 
-		// Only remove test containers (those with cluster-name starting with test-bink-)
-		if strings.Contains(labels, "bink.cluster-name=test-bink-") {
-			rmCmd := exec.Command("podman", "rm", "-f", name)
-			_ = rmCmd.Run() // Ignore errors
+	for _, name := range containerNames {
+		labelValue, err := podmanClient.ContainerInspect(ctx, name, "{{index .Config.Labels \"bink.cluster-name\"}}")
+		if err != nil {
+			continue
+		}
+
+		if strings.HasPrefix(labelValue, "test-bink-") {
+			_ = podmanClient.ContainerRemove(ctx, name, true)
 		}
 	}
 
-	// Clean up test volumes
-	volCmd := exec.Command("podman", "volume", "ls", "--filter", "name=test-", "--format", "{{.Name}}")
-	volOutput, err := volCmd.CombinedOutput()
+	volumes, err := podmanClient.VolumeList(ctx, "name=test-")
 	if err == nil {
-		volumes := strings.Split(strings.TrimSpace(string(volOutput)), "\n")
 		for _, vol := range volumes {
-			if vol != "" && strings.HasPrefix(vol, "test-") {
-				rmVolCmd := exec.Command("podman", "volume", "rm", "-f", vol)
-				_ = rmVolCmd.Run() // Ignore errors
+			if strings.HasPrefix(vol, "test-") {
+				_ = podmanClient.VolumeRemove(ctx, vol)
 			}
 		}
 	}

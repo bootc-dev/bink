@@ -1,10 +1,11 @@
 package helpers
 
 import (
+	"context"
 	"encoding/json"
-	"os/exec"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/podman"
 	. "github.com/onsi/gomega"
 )
 
@@ -18,89 +19,83 @@ type ContainerInfo struct {
 }
 
 // PodmanCmd executes a podman command and returns output
+// Note: This is deprecated - prefer using podman.Client directly in tests
 func PodmanCmd(args ...string) string {
-	cmd := exec.Command("podman", args...)
-	output, err := cmd.CombinedOutput()
-	Expect(err).ToNot(HaveOccurred(), "podman command failed: %s", string(output))
-	return string(output)
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
+	output, err := podmanClient.ContainerExec(ctx, args[0], args[1:])
+	Expect(err).ToNot(HaveOccurred(), "podman command failed")
+	return output
 }
 
 // PodmanExec executes a command inside a container
 func PodmanExec(container, command string) string {
-	cmd := exec.Command("podman", "exec", container, "sh", "-c", command)
-	output, err := cmd.CombinedOutput()
-	Expect(err).ToNot(HaveOccurred(), "podman exec failed: %s", string(output))
-	return string(output)
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
+	output, err := podmanClient.ContainerExec(ctx, container, []string{"sh", "-c", command})
+	Expect(err).ToNot(HaveOccurred(), "podman exec failed")
+	return output
 }
 
 // GetContainer returns information about a container
 // Returns nil if container doesn't exist
 // For test usage, name should be the full container name (e.g., "k8s-test-bink-abc123-node1")
 func GetContainer(name string) *ContainerInfo {
-	cmd := exec.Command("podman", "container", "inspect", name)
-	output, err := cmd.CombinedOutput()
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
 	if err != nil {
-		// Container doesn't exist
 		return nil
 	}
 
-	var containers []map[string]interface{}
-	if err := json.Unmarshal(output, &containers); err != nil {
+	exists, err := podmanClient.ContainerExists(ctx, name)
+	if err != nil || !exists {
 		return nil
 	}
 
-	if len(containers) == 0 {
+	idStr, err := podmanClient.ContainerInspect(ctx, name, "{{.ID}}")
+	if err != nil {
 		return nil
 	}
 
-	c := containers[0]
+	stateStr, err := podmanClient.ContainerInspect(ctx, name, "{{.State.Status}}")
+	if err != nil {
+		return nil
+	}
+
+	ipStr, err := podmanClient.ContainerInspect(ctx, name, "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}")
+	if err != nil {
+		ipStr = ""
+	}
+
 	info := &ContainerInfo{
+		ID:     strings.TrimSpace(idStr),
+		Name:   name,
+		State:  strings.TrimSpace(stateStr),
 		Labels: make(map[string]string),
 	}
 
-	if id, ok := c["Id"].(string); ok {
-		info.ID = id
-	}
-	if name, ok := c["Name"].(string); ok {
-		info.Name = name
-	}
-	if state, ok := c["State"].(map[string]interface{}); ok {
-		if status, ok := state["Status"].(string); ok {
-			info.State = status
-		}
-	}
-
-	// Parse ports
-	if networkSettings, ok := c["NetworkSettings"].(map[string]interface{}); ok {
-		if ports, ok := networkSettings["Ports"].(map[string]interface{}); ok {
-			for port := range ports {
-				info.Ports = append(info.Ports, port)
-			}
-		}
-	}
-
-	// Parse labels
-	if config, ok := c["Config"].(map[string]interface{}); ok {
-		if labels, ok := config["Labels"].(map[string]interface{}); ok {
-			for k, v := range labels {
-				if str, ok := v.(string); ok {
-					info.Labels[k] = str
-				}
-			}
-		}
-	}
+	_ = ipStr
 
 	return info
 }
 
 // GetContainerID returns the ID of a container by name
 func GetContainerID(name string) string {
-	cmd := exec.Command("podman", "container", "inspect", name, "--format", "{{.ID}}")
-	output, err := cmd.CombinedOutput()
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(output))
+
+	output, err := podmanClient.ContainerInspect(ctx, name, "{{.ID}}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(output)
 }
 
 // ContainerExists checks if a container exists
@@ -110,7 +105,15 @@ func ContainerExists(name string) bool {
 
 // GetVolume checks if a volume exists
 func GetVolume(name string) bool {
-	cmd := exec.Command("podman", "volume", "inspect", name)
-	err := cmd.Run()
-	return err == nil
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		return false
+	}
+
+	exists, err := podmanClient.VolumeExists(ctx, name)
+	if err != nil {
+		return false
+	}
+	return exists
 }
