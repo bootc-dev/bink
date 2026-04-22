@@ -124,7 +124,7 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 		}
 	}
 
-	n.virsh = virsh.NewClient(n.ContainerName)
+	n.virsh = virsh.NewClient(n.ContainerName, n.podman)
 
 	return n, nil
 }

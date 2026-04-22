@@ -5,23 +5,24 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bootc-dev/bink/internal/util"
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/sirupsen/logrus"
 )
 
 type Client struct {
 	containerName string
+	podmanClient  *podman.Client
 }
 
-func NewClient(containerName string) *Client {
+func NewClient(containerName string, podmanClient *podman.Client) *Client {
 	return &Client{
 		containerName: containerName,
+		podmanClient:  podmanClient,
 	}
 }
 
 func (c *Client) ExecInContainer(ctx context.Context, args ...string) (string, error) {
-	fullArgs := append([]string{"exec", c.containerName}, args...)
-	return util.RunCommandOutput(ctx, "podman", fullArgs...)
+	return c.podmanClient.ContainerExec(ctx, c.containerName, args)
 }
 
 func (c *Client) VirtInstall(ctx context.Context, opts *VirtInstallOptions) error {
@@ -82,8 +83,7 @@ func (c *Client) VirtInstall(ctx context.Context, opts *VirtInstallOptions) erro
 
 	logrus.Debugf("Creating VM with virt-install: %s", strings.Join(args, " "))
 
-	fullArgs := append([]string{"exec", c.containerName}, args...)
-	return util.RunCommandQuiet(ctx, "podman", fullArgs...)
+	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
 }
 
 func (c *Client) QemuImgCreate(ctx context.Context, opts *QemuImgCreateOptions) error {
@@ -104,8 +104,7 @@ func (c *Client) QemuImgCreate(ctx context.Context, opts *QemuImgCreateOptions) 
 
 	logrus.Debugf("Creating disk image: qemu-img %s", strings.Join(args, " "))
 
-	fullArgs := append([]string{"exec", c.containerName}, args...)
-	return util.RunCommandQuiet(ctx, "podman", fullArgs...)
+	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
 }
 
 func (c *Client) Genisoimage(ctx context.Context, outputPath, volumeID string, files []string) error {
@@ -121,8 +120,7 @@ func (c *Client) Genisoimage(ctx context.Context, outputPath, volumeID string, f
 
 	logrus.Debugf("Creating ISO: genisoimage %s", strings.Join(args, " "))
 
-	fullArgs := append([]string{"exec", c.containerName}, args...)
-	return util.RunCommandQuiet(ctx, "podman", fullArgs...)
+	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
 }
 
 func (c *Client) DomainList(ctx context.Context) ([]string, error) {
@@ -148,12 +146,12 @@ func (c *Client) DomainList(ctx context.Context) ([]string, error) {
 
 func (c *Client) DomainDestroy(ctx context.Context, name string) error {
 	logrus.Debugf("Destroying domain %s", name)
-	return util.RunCommandQuiet(ctx, "podman", "exec", c.containerName,
-		"virsh", "-c", "qemu:///session", "destroy", name)
+	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName,
+		[]string{"virsh", "-c", "qemu:///session", "destroy", name})
 }
 
 func (c *Client) DomainUndefine(ctx context.Context, name string) error {
 	logrus.Debugf("Undefining domain %s", name)
-	return util.RunCommandQuiet(ctx, "podman", "exec", c.containerName,
-		"virsh", "-c", "qemu:///session", "undefine", name)
+	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName,
+		[]string{"virsh", "-c", "qemu:///session", "undefine", name})
 }
