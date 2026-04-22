@@ -307,6 +307,8 @@ func (c *Client) ContainerExecInteractive(ctx context.Context, name string, cmd 
 		WithOutputStream(os.Stdout).
 		WithErrorStream(os.Stderr).
 		WithInputStream(*stdin).
+		WithAttachOutput(true).
+		WithAttachError(true).
 		WithAttachInput(true)
 
 	if err := containers.ExecStartAndAttach(c.conn, sessionID, startOptions); err != nil {
