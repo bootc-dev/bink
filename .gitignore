@@ -2,3 +2,4 @@ test/integration/integration.test
 bink
 vm/
 .claude
+integration.test
