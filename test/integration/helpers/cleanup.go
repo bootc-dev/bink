@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/bootc-dev/bink/internal/podman"

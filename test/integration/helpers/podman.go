@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	"github.com/bootc-dev/bink/internal/podman"
@@ -71,10 +70,21 @@ func GetContainer(name string) *ContainerInfo {
 		ipStr = ""
 	}
 
+	portsStr, err := podmanClient.ContainerInspect(ctx, name, "{{json .NetworkSettings.Ports}}")
+	if err != nil {
+		portsStr = ""
+	}
+
+	var ports []string
+	if portsStr != "" {
+		ports = strings.Split(portsStr, ",")
+	}
+
 	info := &ContainerInfo{
 		ID:     strings.TrimSpace(idStr),
 		Name:   name,
 		State:  strings.TrimSpace(stateStr),
+		Ports:  ports,
 		Labels: make(map[string]string),
 	}
 

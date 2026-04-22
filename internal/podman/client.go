@@ -392,6 +392,8 @@ func (c *Client) ContainerInspect(ctx context.Context, name, format string) (str
 
 	// Handle common format strings
 	switch format {
+	case "{{.ID}}":
+		return data.ID, nil
 	case "{{.State.Status}}":
 		return data.State.Status, nil
 	case "{{.Created}}":
@@ -403,6 +405,15 @@ func (c *Client) ContainerInspect(ctx context.Context, name, format string) (str
 			}
 		}
 		return "", nil
+	case "{{json .NetworkSettings.Ports}}":
+		// Return port mappings as comma-separated strings like "6443/tcp->0.0.0.0:12345"
+		var ports []string
+		for containerPort, bindings := range data.NetworkSettings.Ports {
+			for _, binding := range bindings {
+				ports = append(ports, fmt.Sprintf("%s->%s:%s", containerPort, binding.HostIP, binding.HostPort))
+			}
+		}
+		return strings.Join(ports, ","), nil
 	case "{{index .Config.Labels \"bink.cluster-name\"}}":
 		if name, ok := data.Config.Labels["bink.cluster-name"]; ok {
 			return name, nil
