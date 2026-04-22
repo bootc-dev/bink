@@ -98,8 +98,8 @@ func (n *Node) writeUserData(dir, sshPubKey string) error {
 	if n.Name == "node1" {
 		dnsmasqConfig = fmt.Sprintf(`  - path: /etc/dnsmasq.d/cluster.conf
     content: |
-      interface=enp3s0
-      bind-dynamic
+      listen-address=%s
+      bind-interfaces
       no-hosts
       addn-hosts=/var/lib/dnsmasq/cluster-hosts
       domain=%s
@@ -118,7 +118,7 @@ func (n *Node) writeUserData(dir, sshPubKey string) error {
       [Unit]
       After=network-online.target
       Wants=network-online.target
-`, config.ClusterDomain, config.UpstreamDNS1, config.UpstreamDNS2,
+`, n.ClusterIP, config.ClusterDomain, config.UpstreamDNS1, config.UpstreamDNS2,
 			n.ClusterIP, n.Name, n.Name, config.ClusterDomain)
 
 		dnsmasqRuncmd = `  - chown dnsmasq:dnsmasq /var/lib/dnsmasq/cluster-hosts
@@ -167,6 +167,18 @@ write_files:
       additionalimagestores = [
         "/var/mnt/cluster_images",
       ]
+  - path: /etc/crio/crio.conf.d/01-cni-plugins.conf
+    content: |
+      [crio.network]
+      plugin_dirs = [
+        "/opt/cni/bin",
+        "/var/lib/cni/bin",
+        "/usr/libexec/cni",
+      ]
+  - path: /etc/crio/crio.conf.d/02-capabilities.conf
+    content: |
+      [crio.runtime]
+      add_inheritable_capabilities = true
   - path: /etc/systemd/system/var-mnt-cluster_images.mount
     content: |
       [Unit]
@@ -198,7 +210,8 @@ runcmd:
   - nmcli connection modify "cloud-init enp3s0" ipv4.dns-search "~%s %s"
   - nmcli connection up "cloud-init enp3s0"
 %s
-  - systemctl enable --now crio
+  - systemctl enable crio
+  - systemctl restart crio
   - systemctl enable kubelet
 `, n.Name, config.DefaultSSHUser, sshPubKey, dnsmasqConfig,
 		config.ClusterDomain, config.ClusterDomain, dnsmasqRuncmd)

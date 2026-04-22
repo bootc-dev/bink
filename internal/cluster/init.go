@@ -125,6 +125,15 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	c.logger.Info("CNI plugins will be installed to /opt/cni/bin (tmpfs overlay for bootc)")
 
+	// Patch CoreDNS to run as root - CRI-O doesn't set ambient capabilities
+	// for non-root users, so NET_BIND_SERVICE doesn't take effect for UID 65532
+	c.logger.Info("")
+	c.logger.Info("=== Patching CoreDNS for CRI-O compatibility ===")
+	corednsPatch := `kubectl patch deployment -n kube-system coredns --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/securityContext", "value": {"capabilities": {"add": ["NET_BIND_SERVICE"], "drop": ["ALL"]}, "readOnlyRootFilesystem": true, "runAsUser": 0, "runAsGroup": 0}}]'`
+	if _, err := sshClient.Exec(ctx, corednsPatch); err != nil {
+		return fmt.Errorf("failed to patch CoreDNS: %w", err)
+	}
+
 	c.logger.Info("")
 	c.logger.Infof("✅ Cluster initialized on %s with Calico CNI", nodeName)
 	c.logger.Info("")
