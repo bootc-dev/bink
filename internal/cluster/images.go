@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/podman"
+	"github.com/containers/podman/v6/pkg/specgen"
 	"github.com/sirupsen/logrus"
 )
 
@@ -81,34 +83,19 @@ func (c *Cluster) EnsureImagesVolume(ctx context.Context) error {
 }
 
 func (c *Cluster) volumeExists(ctx context.Context, name string) (bool, error) {
-	cmd := []string{"podman", "volume", "exists", name}
-	err := c.runCommand(ctx, cmd...)
-	return err == nil, nil
+	return c.podmanClient.VolumeExists(ctx, name)
 }
 
 func (c *Cluster) createVolume(ctx context.Context, name string) error {
-	cmd := []string{"podman", "volume", "create", name}
-	err := c.runCommand(ctx, cmd...)
-	if err != nil {
-		// If volume already exists due to race condition, that's fine
-		if strings.Contains(err.Error(), "volume already exists") {
-			logrus.Debugf("Volume %s already exists (created by parallel process)", name)
-			return nil
-		}
-		return err
-	}
-	return nil
+	return c.podmanClient.VolumeCreate(ctx, name)
 }
 
 func (c *Cluster) isVolumePopulated(ctx context.Context, volumeName string) (bool, error) {
-	// Run a container to check if the volume has container storage structure
-	cmd := []string{
-		"podman", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/check:z", volumeName),
+	err := c.podmanClient.ContainerRunQuiet(ctx,
 		config.DefaultBaseImage,
-		"sh", "-c", "test -d /check/overlay-images && test -d /check/overlay-layers",
-	}
-	err := c.runCommand(ctx, cmd...)
+		[]string{"sh", "-c", "test -d /check/overlay-images && test -d /check/overlay-layers"},
+		[]string{fmt.Sprintf("%s:/check:z", volumeName)},
+	)
 	return err == nil, nil
 }
 
@@ -121,12 +108,11 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 	// If that fails, fall back to hardcoded list
 	var images []string
 
-	cmd := []string{
-		"podman", "run", "--rm",
+	output, err := c.podmanClient.ContainerRunOutput(ctx,
 		"localhost/fedora-bootc-k8s:latest",
-		"kubeadm", "config", "images", "list", "--kubernetes-version", k8sVersion,
-	}
-	output, err := c.runCommandOutput(ctx, cmd...)
+		[]string{"kubeadm", "config", "images", "list", "--kubernetes-version", k8sVersion},
+		nil,
+	)
 	if err != nil {
 		logrus.Warnf("Could not get image list from kubeadm: %v", err)
 		logrus.Info("Using hardcoded image list for Kubernetes v1.35.0")
@@ -153,46 +139,33 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 
 	logrus.Infof("Creating populator container: %s", tmpContainer)
 
-	// Start a long-running container that we can exec into
-	startCmd := []string{
-		"podman", "run", "-d",
-		"--name", tmpContainer,
-		"-v", fmt.Sprintf("%s:/var/lib/containers/storage:z", volumeName),
-		config.DefaultBaseImage,
-		"sleep", "3600",
+	opts := &podman.ContainerCreateOptions{
+		Name:    tmpContainer,
+		Image:   config.DefaultBaseImage,
+		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
 	}
 
-	if err := c.runCommand(ctx, startCmd...); err != nil {
-		// Container name already in use means another process is populating
+	_, err = c.podmanClient.ContainerCreate(ctx, opts)
+	if err != nil {
 		return fmt.Errorf("starting populator container (another process may be populating): %w", err)
 	}
 
-	// Ensure cleanup
 	defer func() {
 		logrus.Debugf("Cleaning up populator container %s", tmpContainer)
-		c.runCommand(ctx, "podman", "rm", "-f", tmpContainer)
+		c.podmanClient.ContainerRemove(ctx, tmpContainer, true)
 	}()
 
-	// Install skopeo and podman in the container
 	logrus.Info("Installing container tools in temporary container...")
-	installCmd := []string{
-		"podman", "exec", tmpContainer,
-		"dnf", "install", "-y", "-q", "skopeo", "podman",
-	}
-	if err := c.runCommand(ctx, installCmd...); err != nil {
+	if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
+		[]string{"dnf", "install", "-y", "-q", "skopeo", "podman"}); err != nil {
 		return fmt.Errorf("installing container tools: %w", err)
 	}
 
-	// Configure subuid/subgid to allow user namespacing
 	logrus.Debug("Configuring storage for image extraction...")
-	setupStorageCmd := []string{
-		"podman", "exec", tmpContainer,
-		"sh", "-c",
-		"echo 'root:100000:65536' > /etc/subuid && " +
+	if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
+		[]string{"sh", "-c", "echo 'root:100000:65536' > /etc/subuid && " +
 			"echo 'root:100000:65536' > /etc/subgid && " +
-			"podman system migrate 2>/dev/null || true",
-	}
-	if err := c.runCommand(ctx, setupStorageCmd...); err != nil {
+			"podman system migrate 2>/dev/null || true"}); err != nil {
 		logrus.Debug("Storage configuration completed with warnings")
 	}
 
@@ -203,14 +176,8 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 		}
 		logrus.Infof("[%d/%d] Pulling %s", i+1, len(images), image)
 
-		pullCmd := []string{
-			"podman", "exec", tmpContainer,
-			"skopeo", "copy",
-			"docker://" + image,
-			"containers-storage:" + image,
-		}
-
-		if err := c.runCommand(ctx, pullCmd...); err != nil {
+		if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
+			[]string{"skopeo", "copy", "docker://" + image, "containers-storage:" + image}); err != nil {
 			logrus.Warnf("Failed to pull %s: %v (continuing...)", image, err)
 			continue
 		}
@@ -228,43 +195,37 @@ func (c *Cluster) GetImagesVolumeName() string {
 
 // isVolumeCompleted checks if volume has been successfully populated
 func (c *Cluster) isVolumeCompleted(ctx context.Context, volumeName string) bool {
-	cmd := []string{
-		"podman", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/check:z", volumeName),
+	err := c.podmanClient.ContainerRunQuiet(ctx,
 		config.DefaultBaseImage,
-		"test", "-f", "/check/.completed",
-	}
-	err := c.runCommand(ctx, cmd...)
+		[]string{"test", "-f", "/check/.completed"},
+		[]string{fmt.Sprintf("%s:/check:z", volumeName)},
+	)
 	return err == nil
 }
 
 // isPopulationInProgress checks if the populator container is currently running
 func (c *Cluster) isPopulationInProgress(ctx context.Context) bool {
-	cmd := []string{"podman", "container", "exists", PopulatorContainerName}
-	err := c.runCommand(ctx, cmd...)
-	return err == nil
+	exists, err := c.podmanClient.ContainerExists(ctx, PopulatorContainerName)
+	if err != nil {
+		return false
+	}
+	return exists
 }
 
 // waitForPopulationComplete waits for the populator container to finish
-// Uses `podman wait` which is event-driven (no polling/sleep)
 func (c *Cluster) waitForPopulationComplete(ctx context.Context) error {
 	logrus.Debugf("Waiting for populator container %s to complete...", PopulatorContainerName)
 
-	// Use podman wait to block until container exits (event-driven, no polling)
-	cmd := []string{"podman", "wait", PopulatorContainerName}
-	exitCode, err := c.runCommandOutput(ctx, cmd...)
+	exitCode, err := c.podmanClient.ContainerWait(ctx, PopulatorContainerName)
 	if err != nil {
-		// Container might have already exited and been removed
 		logrus.Debugf("Container wait failed (may have already completed): %v", err)
 		return nil
 	}
 
-	exitCode = strings.TrimSpace(exitCode)
-	logrus.Debugf("Populator container exited with code: %s", exitCode)
+	logrus.Debugf("Populator container exited with code: %d", exitCode)
 
-	// Check if population was successful
-	if exitCode != "0" {
-		return fmt.Errorf("population failed with exit code %s", exitCode)
+	if exitCode != 0 {
+		return fmt.Errorf("population failed with exit code %d", exitCode)
 	}
 
 	return nil
@@ -272,11 +233,9 @@ func (c *Cluster) waitForPopulationComplete(ctx context.Context) error {
 
 // markVolumeCompleted creates a marker file indicating successful population
 func (c *Cluster) markVolumeCompleted(ctx context.Context, volumeName string) error {
-	cmd := []string{
-		"podman", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/mark:z", volumeName),
+	return c.podmanClient.ContainerRunQuiet(ctx,
 		config.DefaultBaseImage,
-		"touch", "/mark/.completed",
-	}
-	return c.runCommand(ctx, cmd...)
+		[]string{"touch", "/mark/.completed"},
+		[]string{fmt.Sprintf("%s:/mark:z", volumeName)},
+	)
 }

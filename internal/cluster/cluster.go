@@ -3,20 +3,21 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/bootc-dev/bink/internal/node"
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
 // Cluster represents a Kubernetes cluster
 type Cluster struct {
-	name          string
-	controlPlane  string
-	logger        *logrus.Logger
+	name         string
+	controlPlane string
+	logger       *logrus.Logger
+	podmanClient *podman.Client
 }
 
 // Config holds cluster configuration
@@ -38,10 +39,16 @@ func New(cfg Config) *Cluster {
 		cfg.ControlPlane = "node1"
 	}
 
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		cfg.Logger.Warnf("Failed to create podman client: %v", err)
+	}
+
 	return &Cluster{
 		name:         cfg.Name,
 		controlPlane: cfg.ControlPlane,
 		logger:       cfg.Logger,
+		podmanClient: podmanClient,
 	}
 }
 
@@ -111,36 +118,4 @@ func (c *Cluster) WaitForCloudInit(ctx context.Context, nodeName string, timeout
 // GetNodeClusterIP returns the cluster IP for a node
 func (c *Cluster) GetNodeClusterIP(nodeName string) string {
 	return node.CalculateClusterIP(nodeName)
-}
-
-// runCommand runs a command and returns error if it fails
-func (c *Cluster) runCommand(ctx context.Context, args ...string) error {
-	cmd := args[0]
-	cmdArgs := args[1:]
-
-	c.logger.Debugf("Running: %s %v", cmd, cmdArgs)
-
-	execCmd := exec.CommandContext(ctx, cmd, cmdArgs...)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		c.logger.Debugf("Command failed: %s", string(output))
-		return fmt.Errorf("%w: %s", err, string(output))
-	}
-	return nil
-}
-
-// runCommandOutput runs a command and returns its output
-func (c *Cluster) runCommandOutput(ctx context.Context, args ...string) (string, error) {
-	cmd := args[0]
-	cmdArgs := args[1:]
-
-	c.logger.Debugf("Running: %s %v", cmd, cmdArgs)
-
-	execCmd := exec.CommandContext(ctx, cmd, cmdArgs...)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		c.logger.Debugf("Command failed: %s", string(output))
-		return "", fmt.Errorf("%w: %s", err, string(output))
-	}
-	return string(output), nil
 }

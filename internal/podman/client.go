@@ -15,6 +15,7 @@ import (
 	"github.com/containers/podman/v6/pkg/bindings/containers"
 	"github.com/containers/podman/v6/pkg/bindings/network"
 	"github.com/containers/podman/v6/pkg/bindings/volumes"
+	"github.com/containers/podman/v6/pkg/domain/entities"
 	"github.com/containers/podman/v6/pkg/specgen"
 	"github.com/sirupsen/logrus"
 	nettypes "go.podman.io/common/libnetwork/types"
@@ -480,6 +481,156 @@ func (c *Client) VolumeRemove(ctx context.Context, name string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) VolumeExists(ctx context.Context, name string) (bool, error) {
+	if err := c.ensureConnection(); err != nil {
+		return false, err
+	}
+
+	_, err := volumes.Inspect(c.conn, name, nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such volume") || strings.Contains(err.Error(), "volume not found") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (c *Client) VolumeCreate(ctx context.Context, name string) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	logrus.Infof("Creating volume '%s'", name)
+
+	opts := entities.VolumeCreateOptions{
+		Name: name,
+	}
+	_, err := volumes.Create(c.conn, opts, nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "volume already exists") {
+			logrus.Debugf("Volume %s already exists (created by parallel process)", name)
+			return nil
+		}
+		return fmt.Errorf("creating volume: %w", err)
+	}
+
+	logrus.Infof("Volume '%s' created successfully", name)
+	return nil
+}
+
+func (c *Client) ContainerWait(ctx context.Context, name string) (int64, error) {
+	if err := c.ensureConnection(); err != nil {
+		return 0, err
+	}
+
+	logrus.Debugf("Waiting for container %s to exit...", name)
+
+	exitCode, err := containers.Wait(c.conn, name, nil)
+	if err != nil {
+		return 0, fmt.Errorf("waiting for container: %w", err)
+	}
+
+	return int64(exitCode), nil
+}
+
+func (c *Client) ContainerRunQuiet(ctx context.Context, image string, cmd []string, volumeMounts []string) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	spec := specgen.NewSpecGenerator(image, false)
+	spec.Command = cmd
+	remove := true
+	spec.Remove = &remove
+
+	for _, mount := range volumeMounts {
+		parts := strings.SplitN(mount, ":", 3)
+		if len(parts) >= 2 {
+			spec.Volumes = append(spec.Volumes, &specgen.NamedVolume{
+				Name: parts[0],
+				Dest: parts[1],
+			})
+		}
+	}
+
+	createResponse, err := containers.CreateWithSpec(c.conn, spec, nil)
+	if err != nil {
+		return fmt.Errorf("creating container: %w", err)
+	}
+
+	if err := containers.Start(c.conn, createResponse.ID, nil); err != nil {
+		return fmt.Errorf("starting container: %w", err)
+	}
+
+	exitCode, err := containers.Wait(c.conn, createResponse.ID, nil)
+	if err != nil {
+		return fmt.Errorf("waiting for container: %w", err)
+	}
+
+	if exitCode != 0 {
+		return fmt.Errorf("container exited with code %d", exitCode)
+	}
+
+	return nil
+}
+
+func (c *Client) ContainerRunOutput(ctx context.Context, image string, cmd []string, volumeMounts []string) (string, error) {
+	if err := c.ensureConnection(); err != nil {
+		return "", err
+	}
+
+	spec := specgen.NewSpecGenerator(image, false)
+	spec.Command = cmd
+	remove := true
+	spec.Remove = &remove
+
+	for _, mount := range volumeMounts {
+		parts := strings.SplitN(mount, ":", 3)
+		if len(parts) >= 2 {
+			spec.Volumes = append(spec.Volumes, &specgen.NamedVolume{
+				Name: parts[0],
+				Dest: parts[1],
+			})
+		}
+	}
+
+	createResponse, err := containers.CreateWithSpec(c.conn, spec, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating container: %w", err)
+	}
+
+	if err := containers.Start(c.conn, createResponse.ID, nil); err != nil {
+		return "", fmt.Errorf("starting container: %w", err)
+	}
+
+	exitCode, err := containers.Wait(c.conn, createResponse.ID, nil)
+	if err != nil {
+		return "", fmt.Errorf("waiting for container: %w", err)
+	}
+
+	stdoutChan := make(chan string, 1)
+	stderrChan := make(chan string, 1)
+	opts := new(containers.LogOptions)
+	stdout := true
+	opts.Stdout = &stdout
+
+	go func() {
+		containers.Logs(c.conn, createResponse.ID, opts, stdoutChan, stderrChan)
+	}()
+
+	var output strings.Builder
+	for msg := range stdoutChan {
+		output.WriteString(msg)
+	}
+
+	if exitCode != 0 {
+		return "", fmt.Errorf("container exited with code %d", exitCode)
+	}
+
+	return output.String(), nil
 }
 
 func (c *Client) GetPublishedPort(ctx context.Context, containerName, containerPort string) (int, error) {
