@@ -107,6 +107,7 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 			RemotePort:    "6443",
 			BindAddress:   "0.0.0.0",
 			Logger:        logger,
+			PodmanClient:  podmanClient,
 		}
 
 		if err := ssh.StartTunnel(ctx, tunnelCfg); err != nil {
@@ -148,6 +149,7 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 		KeyPath:       config.ClusterKeyPath,
 		User:          config.DefaultSSHUser,
 		Logger:        logger,
+		PodmanClient:  podmanClient,
 	})
 
 	kubeconfigContent, err := sshClient.Exec(ctx, "cat ~/.kube/config")

@@ -3,9 +3,9 @@ package ssh
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,11 +19,20 @@ type TunnelConfig struct {
 	RemotePort    string
 	BindAddress   string
 	Logger        *logrus.Logger
+	PodmanClient  *podman.Client
 }
 
 func StartTunnel(ctx context.Context, cfg TunnelConfig) error {
 	if cfg.Logger == nil {
 		cfg.Logger = logrus.New()
+	}
+
+	if cfg.PodmanClient == nil {
+		var err error
+		cfg.PodmanClient, err = podman.NewClient()
+		if err != nil {
+			return fmt.Errorf("creating podman client: %w", err)
+		}
 	}
 
 	bindAddr := cfg.BindAddress
@@ -32,6 +41,7 @@ func StartTunnel(ctx context.Context, cfg TunnelConfig) error {
 	}
 
 	sshArgs := []string{
+		"ssh",
 		"-N",
 		"-L", fmt.Sprintf("%s:%s:localhost:%s", bindAddr, cfg.LocalPort, cfg.RemotePort),
 		"-o", "StrictHostKeyChecking=no",
@@ -42,26 +52,28 @@ func StartTunnel(ctx context.Context, cfg TunnelConfig) error {
 		fmt.Sprintf("%s@%s", cfg.User, cfg.Host),
 	}
 
-	podmanArgs := append([]string{"exec", "-d", cfg.ContainerName, "ssh"}, sshArgs...)
-
-	cfg.Logger.Debugf("Starting SSH tunnel: podman %s", strings.Join(podmanArgs, " "))
+	cfg.Logger.Debugf("Starting SSH tunnel: podman exec %s %s", cfg.ContainerName, strings.Join(sshArgs, " "))
 	cfg.Logger.Infof("Starting SSH port forwarding: %s:%s -> VM:%s", bindAddr, cfg.LocalPort, cfg.RemotePort)
 
-	cmd := exec.CommandContext(ctx, "podman", podmanArgs...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("starting SSH tunnel: %w: %s", err, string(output))
-	}
+	go func() {
+		if err := cfg.PodmanClient.ContainerExecQuiet(context.Background(), cfg.ContainerName, sshArgs); err != nil {
+			cfg.Logger.Warnf("SSH tunnel exited: %v", err)
+		}
+	}()
 
 	return nil
 }
 
 func IsTunnelActive(ctx context.Context, containerName, port string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "podman", "exec", containerName, "ss", "-tln")
-	output, err := cmd.CombinedOutput()
+	podmanClient, err := podman.NewClient()
 	if err != nil {
-		return false, fmt.Errorf("checking tunnel status: %w: %s", err, string(output))
+		return false, fmt.Errorf("creating podman client: %w", err)
 	}
 
-	return strings.Contains(string(output), fmt.Sprintf(":%s", port)), nil
+	output, err := podmanClient.ContainerExec(ctx, containerName, []string{"ss", "-tln"})
+	if err != nil {
+		return false, fmt.Errorf("checking tunnel status: %w", err)
+	}
+
+	return strings.Contains(output, fmt.Sprintf(":%s", port)), nil
 }

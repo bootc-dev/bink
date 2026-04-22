@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,16 +19,18 @@ type Client struct {
 	keyPath       string
 	user          string
 	logger        *logrus.Logger
+	podmanClient  *podman.Client
 }
 
 // Config holds SSH client configuration
 type Config struct {
-	ContainerName string // Podman container name
-	Host          string // SSH host (usually "localhost" for port-forwarded VMs)
-	Port          string // SSH port (usually "2222" for port-forwarded VMs)
-	KeyPath       string // Path to SSH private key
-	User          string // SSH user (usually "core")
+	ContainerName string         // Podman container name
+	Host          string         // SSH host (usually "localhost" for port-forwarded VMs)
+	Port          string         // SSH port (usually "2222" for port-forwarded VMs)
+	KeyPath       string         // Path to SSH private key
+	User          string         // SSH user (usually "core")
 	Logger        *logrus.Logger
+	PodmanClient  *podman.Client // Podman client for container operations
 }
 
 // NewClient creates a new SSH client
@@ -43,38 +45,39 @@ func NewClient(cfg Config) *Client {
 		keyPath:       cfg.KeyPath,
 		user:          cfg.User,
 		logger:        cfg.Logger,
+		podmanClient:  cfg.PodmanClient,
 	}
 }
 
 // Exec executes a command via SSH and returns stdout
 func (c *Client) Exec(ctx context.Context, command string) (string, error) {
 	sshArgs := c.buildSSHArgs(command)
+	execCmd := append([]string{"ssh"}, sshArgs...)
 
-	cmd := exec.CommandContext(ctx, "podman", append([]string{"exec", c.containerName, "ssh"}, sshArgs...)...)
+	c.logger.Debugf("Running: podman exec %s %s", c.containerName, strings.Join(execCmd, " "))
 
-	c.logger.Debugf("Running: podman exec %s ssh %s", c.containerName, strings.Join(sshArgs, " "))
-
-	output, err := cmd.CombinedOutput()
+	output, err := c.podmanClient.ContainerExec(ctx, c.containerName, execCmd)
 	if err != nil {
-		return "", fmt.Errorf("ssh exec failed: %w: %s", err, string(output))
+		return "", fmt.Errorf("ssh exec failed: %w", err)
 	}
 
-	return string(output), nil
+	return output, nil
 }
 
 // ExecWithOutput executes a command via SSH, streaming output to stdout/stderr
 func (c *Client) ExecWithOutput(ctx context.Context, command string) error {
 	sshArgs := c.buildSSHArgs(command)
+	execCmd := append([]string{"ssh"}, sshArgs...)
 
-	cmd := exec.CommandContext(ctx, "podman", append([]string{"exec", c.containerName, "ssh"}, sshArgs...)...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	c.logger.Debugf("Running: podman exec %s %s", c.containerName, strings.Join(execCmd, " "))
 
-	c.logger.Debugf("Running: podman exec %s ssh %s", c.containerName, strings.Join(sshArgs, " "))
-
-	if err := cmd.Run(); err != nil {
+	output, err := c.podmanClient.ContainerExec(ctx, c.containerName, execCmd)
+	if err != nil {
 		return fmt.Errorf("ssh exec failed: %w", err)
 	}
+
+	// Write output to stdout (ContainerExec buffers output, so we write it here)
+	fmt.Fprint(os.Stdout, output)
 
 	return nil
 }
@@ -82,16 +85,12 @@ func (c *Client) ExecWithOutput(ctx context.Context, command string) error {
 // Interactive starts an interactive SSH session
 func (c *Client) Interactive(ctx context.Context) error {
 	sshArgs := c.buildSSHArgs("")
-
-	cmd := exec.CommandContext(ctx, "podman", append([]string{"exec", "-ti", c.containerName, "ssh"}, sshArgs...)...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	execCmd := append([]string{"ssh"}, sshArgs...)
 
 	c.logger.Infof("Connecting to %s (SSH: %s:%s, cluster IP) as user %s",
 		c.containerName, c.host, c.port, c.user)
 
-	if err := cmd.Run(); err != nil {
+	if err := c.podmanClient.ContainerExecInteractive(ctx, c.containerName, execCmd); err != nil {
 		return fmt.Errorf("interactive ssh failed: %w", err)
 	}
 
@@ -101,6 +100,7 @@ func (c *Client) Interactive(ctx context.Context) error {
 // CopyTo copies a file to the remote host via SCP
 func (c *Client) CopyTo(ctx context.Context, localPath, remotePath string) error {
 	scpArgs := []string{
+		"scp",
 		"-P", c.port,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
@@ -109,13 +109,11 @@ func (c *Client) CopyTo(ctx context.Context, localPath, remotePath string) error
 		fmt.Sprintf("%s@%s:%s", c.user, c.host, remotePath),
 	}
 
-	cmd := exec.CommandContext(ctx, "podman", append([]string{"exec", c.containerName, "scp"}, scpArgs...)...)
+	c.logger.Debugf("Running: podman exec %s %s", c.containerName, strings.Join(scpArgs, " "))
 
-	c.logger.Debugf("Running: podman exec %s scp %s", c.containerName, strings.Join(scpArgs, " "))
-
-	output, err := cmd.CombinedOutput()
+	_, err := c.podmanClient.ContainerExec(ctx, c.containerName, scpArgs)
 	if err != nil {
-		return fmt.Errorf("scp failed: %w: %s", err, string(output))
+		return fmt.Errorf("scp failed: %w", err)
 	}
 
 	return nil
@@ -136,11 +134,11 @@ func (c *Client) WaitForSSH(ctx context.Context, maxRetries int) error {
 
 		sshArgs := c.buildSSHArgs("true")
 		sshArgs = append(sshArgs, "-o", "ConnectTimeout=2")
+		execCmd := append([]string{"ssh"}, sshArgs...)
 
-		cmd := exec.CommandContext(ctx, "podman", append([]string{"exec", c.containerName, "ssh"}, sshArgs...)...)
 		c.logger.Debugf("SSH check attempt %d/%d (backoff: %v)", i, maxRetries, backoff)
 
-		if err := cmd.Run(); err == nil {
+		if err := c.podmanClient.ContainerExecQuiet(ctx, c.containerName, execCmd); err == nil {
 			c.logger.Info("✓ SSH is ready")
 			return nil
 		}

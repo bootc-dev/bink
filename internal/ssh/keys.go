@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,6 +65,13 @@ func NewClientForNode(clusterName, nodeName string, logger interface{}) *Client 
 		containerName = fmt.Sprintf("k8s-%s", nodeName)
 	}
 
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		if l, ok := logger.(*logrus.Logger); ok {
+			l.Warnf("Failed to create podman client: %v", err)
+		}
+	}
+
 	return NewClient(Config{
 		ContainerName: containerName,
 		Host:          DefaultSSHHost,
@@ -71,5 +79,6 @@ func NewClientForNode(clusterName, nodeName string, logger interface{}) *Client 
 		KeyPath:       DefaultKeyPath,
 		User:          DefaultSSHUser,
 		Logger:        logger.(*logrus.Logger),
+		PodmanClient:  podmanClient,
 	})
 }
