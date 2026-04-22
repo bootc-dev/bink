@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
@@ -74,12 +75,11 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	// Create kubeadm config in container
 	c.logger.Info("Creating kubeadm config file...")
-	var containerName string
-	if c.name != "" && c.name != "podman" {
-		containerName = fmt.Sprintf("k8s-%s-%s", c.name, nodeName)
-	} else {
-		containerName = fmt.Sprintf("k8s-%s", nodeName)
+	clusterLabel := c.name
+	if clusterLabel == "" {
+		clusterLabel = config.DefaultNetworkName
 	}
+	containerName := fmt.Sprintf("k8s-%s-%s", clusterLabel, nodeName)
 	if err := c.createKubeadmConfig(ctx, containerName, clusterIP); err != nil {
 		return fmt.Errorf("failed to create kubeadm config: %w", err)
 	}

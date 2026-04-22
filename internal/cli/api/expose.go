@@ -46,18 +46,13 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 	// Build cluster-aware container name
 	clusterName := viper.GetString("cluster.name")
 
-	// If using default kubeconfig path and have a named cluster, use cluster-specific path
+	// Use cluster-specific kubeconfig path
 	defaultPath := filepath.Join(config.DefaultKubeconfigDir, "kubeconfig")
-	if kubeconfigPath == defaultPath && clusterName != "" && clusterName != "podman" {
+	if kubeconfigPath == defaultPath {
 		kubeconfigPath = filepath.Join(config.DefaultKubeconfigDir, fmt.Sprintf("kubeconfig-%s", clusterName))
 	}
 
-	var containerName string
-	if clusterName != "" && clusterName != config.DefaultNetworkName {
-		containerName = fmt.Sprintf("%s%s-%s", config.ContainerNamePrefix, clusterName, nodeName)
-	} else {
-		containerName = config.ContainerNamePrefix + nodeName
-	}
+	containerName := fmt.Sprintf("%s%s-%s", config.ContainerNamePrefix, clusterName, nodeName)
 
 	podmanClient, err := podman.NewClient()
 	if err != nil {

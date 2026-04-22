@@ -30,17 +30,12 @@ func (n *Node) createContainer(ctx context.Context) error {
 	// Cluster images volume is shared across all clusters (same images for all)
 	clusterImagesVolume := "cluster-images"
 
-	// Cluster keys volume is namespaced per cluster for parallel test support
-	clusterKeysVolume := "cluster-keys"
-	if n.ClusterName != "" && n.ClusterName != "podman" {
-		clusterKeysVolume = fmt.Sprintf("%s-cluster-keys", n.ClusterName)
-	}
-
-	// Add cluster label for filtering
+	// Cluster keys volume is namespaced per cluster
 	clusterLabel := n.ClusterName
 	if clusterLabel == "" {
-		clusterLabel = "podman"
+		clusterLabel = config.DefaultNetworkName
 	}
+	clusterKeysVolume := fmt.Sprintf("%s-cluster-keys", clusterLabel)
 
 	opts := &podman.ContainerCreateOptions{
 		Name:    n.ContainerName,

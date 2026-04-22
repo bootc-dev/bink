@@ -105,10 +105,11 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 	}
 
 	// Build container name with cluster name for uniqueness
-	n.ContainerName = config.ContainerNamePrefix + name
-	if n.ClusterName != "" && n.ClusterName != config.DefaultNetworkName {
-		n.ContainerName = config.ContainerNamePrefix + n.ClusterName + "-" + name
+	clusterLabel := n.ClusterName
+	if clusterLabel == "" {
+		clusterLabel = config.DefaultNetworkName
 	}
+	n.ContainerName = config.ContainerNamePrefix + clusterLabel + "-" + name
 
 	// Set cluster IP and MAC
 	n.ClusterIP = CalculateClusterIP(name)

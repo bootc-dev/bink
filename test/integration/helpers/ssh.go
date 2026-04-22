@@ -15,12 +15,10 @@ func SSHExec(clusterName, nodeName, command string) string {
 	podmanClient, err := podman.NewClient()
 	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
 
-	var containerName string
-	if clusterName != "" && clusterName != "podman" {
-		containerName = fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
-	} else {
-		containerName = fmt.Sprintf("k8s-%s", nodeName)
+	if clusterName == "" {
+		clusterName = "podman"
 	}
+	containerName := fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
 
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /var/run/cluster/cluster.key -p 2222 core@localhost '%s'", command)
 
@@ -48,12 +46,10 @@ func SSHExecQuiet(clusterName, nodeName, command string) (string, error) {
 		return "", err
 	}
 
-	var containerName string
-	if clusterName != "" && clusterName != "podman" {
-		containerName = fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
-	} else {
-		containerName = fmt.Sprintf("k8s-%s", nodeName)
+	if clusterName == "" {
+		clusterName = "podman"
 	}
+	containerName := fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
 
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /var/run/cluster/cluster.key -p 2222 core@localhost '%s'", command)
 

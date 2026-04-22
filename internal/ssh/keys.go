@@ -56,14 +56,10 @@ func EnsureHostKeys(keyDir string) error {
 
 // NewClientForNode creates a new SSH client for a given node
 func NewClientForNode(clusterName, nodeName string, logger interface{}) *Client {
-	var containerName string
-	if clusterName != "" && clusterName != "podman" {
-		// Use cluster-specific name: k8s-{cluster}-{node}
-		containerName = fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
-	} else {
-		// Default: k8s-{node}
-		containerName = fmt.Sprintf("k8s-%s", nodeName)
+	if clusterName == "" {
+		clusterName = "podman"
 	}
+	containerName := fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
 
 	podmanClient, err := podman.NewClient()
 	if err != nil {

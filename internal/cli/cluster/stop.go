@@ -100,10 +100,7 @@ func runStop(ctx context.Context, logger *logrus.Logger, force, removeData bool)
 		if err := removeClusterData(logger, clusterName, containers); err != nil {
 			logger.Warnf("Failed to remove some data: %v", err)
 			logger.Warn("You may need to manually clean up:")
-			clusterKeysVolume := "cluster-keys"
-			if clusterName != "" && clusterName != "podman" {
-				clusterKeysVolume = fmt.Sprintf("%s-cluster-keys", clusterName)
-			}
+			clusterKeysVolume := fmt.Sprintf("%s-cluster-keys", clusterName)
 			logger.Warnf("  - Cluster keys volume: podman volume rm %s", clusterKeysVolume)
 			logger.Warn("  - Kubeconfig: rm -f ./vm/kubeconfig")
 		} else {
@@ -123,11 +120,7 @@ func removeClusterData(logger *logrus.Logger, clusterName string, containers []s
 	}
 	ctx := context.Background()
 
-	// Determine cluster keys volume name (namespace by cluster name for parallel test support)
-	clusterKeysVolume := "cluster-keys"
-	if clusterName != "" && clusterName != "podman" {
-		clusterKeysVolume = fmt.Sprintf("%s-cluster-keys", clusterName)
-	}
+	clusterKeysVolume := fmt.Sprintf("%s-cluster-keys", clusterName)
 
 	// Remove cluster-keys volume
 	logger.Infof("Removing cluster-keys volume: %s...", clusterKeysVolume)
@@ -139,11 +132,7 @@ func removeClusterData(logger *logrus.Logger, clusterName string, containers []s
 	}
 
 	// Remove cluster-specific kubeconfig if it exists
-	kubeconfigPath := filepath.Join(config.DefaultKubeconfigDir, "kubeconfig")
-	if clusterName != "" && clusterName != "podman" {
-		// For named clusters, look for cluster-specific kubeconfig
-		kubeconfigPath = filepath.Join(config.DefaultKubeconfigDir, fmt.Sprintf("kubeconfig-%s", clusterName))
-	}
+	kubeconfigPath := filepath.Join(config.DefaultKubeconfigDir, fmt.Sprintf("kubeconfig-%s", clusterName))
 	if err := os.Remove(kubeconfigPath); err != nil {
 		if !os.IsNotExist(err) {
 			logger.Warnf("Failed to remove kubeconfig %s: %v", kubeconfigPath, err)
