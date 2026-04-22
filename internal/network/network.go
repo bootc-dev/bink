@@ -9,6 +9,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Remove removes a network
+func (m *Manager) Remove(ctx context.Context, name string) error {
+	exists, err := m.podman.NetworkExists(ctx, name)
+	if err != nil {
+		return fmt.Errorf("checking if network exists: %w", err)
+	}
+
+	if !exists {
+		logrus.Debugf("Network '%s' does not exist, skipping removal", name)
+		return nil
+	}
+
+	if err := m.podman.NetworkRemove(ctx, name); err != nil {
+		return fmt.Errorf("removing network: %w", err)
+	}
+
+	logrus.Infof("Removed network '%s'", name)
+	return nil
+}
+
 type Manager struct {
 	podman *podman.Client
 }
@@ -45,18 +65,24 @@ func (m *Manager) GetSubnet(ctx context.Context, name string) (string, error) {
 	return subnet, nil
 }
 
-func (m *Manager) EnsureClusterNetwork(ctx context.Context) error {
+func (m *Manager) EnsureClusterNetwork(ctx context.Context, clusterName string) error {
 	logrus.Info("Ensuring cluster network exists")
 
-	if err := m.Create(ctx, config.DefaultNetworkName, config.DefaultSubnet); err != nil {
+	// Use cluster-specific network name for isolation
+	networkName := clusterName
+	if networkName == "" {
+		networkName = config.DefaultNetworkName
+	}
+
+	if err := m.Create(ctx, networkName, config.DefaultSubnet); err != nil {
 		return fmt.Errorf("creating cluster network: %w", err)
 	}
 
-	subnet, err := m.GetSubnet(ctx, config.DefaultNetworkName)
+	subnet, err := m.GetSubnet(ctx, networkName)
 	if err != nil {
 		return fmt.Errorf("getting network subnet: %w", err)
 	}
 
-	logrus.Infof("Cluster network '%s' ready with subnet %s", config.DefaultNetworkName, subnet)
+	logrus.Infof("Cluster network '%s' ready with subnet %s", networkName, subnet)
 	return nil
 }

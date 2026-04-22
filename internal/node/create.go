@@ -37,10 +37,16 @@ func (n *Node) createContainer(ctx context.Context) error {
 	}
 	clusterKeysVolume := fmt.Sprintf("%s-cluster-keys", clusterLabel)
 
+	// Use cluster-specific network for isolation
+	networkName := n.ClusterName
+	if networkName == "" {
+		networkName = config.DefaultNetworkName
+	}
+
 	opts := &podman.ContainerCreateOptions{
 		Name:    n.ContainerName,
 		Image:   config.DefaultClusterImage,
-		Network: config.DefaultNetworkName,
+		Network: networkName,
 		Devices: []specs.LinuxDevice{
 			{Path: "/dev/kvm"},
 			{Path: "/dev/fuse"},

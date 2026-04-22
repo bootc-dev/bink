@@ -150,6 +150,26 @@ func (c *Client) NetworkInspect(ctx context.Context, name, format string) (strin
 	}
 }
 
+func (c *Client) NetworkRemove(ctx context.Context, name string) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	logrus.Debugf("Removing network '%s'", name)
+
+	_, err := network.Remove(c.conn, name, nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such network") || strings.Contains(err.Error(), "network not found") {
+			logrus.Debugf("Network '%s' does not exist", name)
+			return nil
+		}
+		return fmt.Errorf("removing network: %w", err)
+	}
+
+	logrus.Infof("Network '%s' removed successfully", name)
+	return nil
+}
+
 func (c *Client) ContainerExists(ctx context.Context, name string) (bool, error) {
 	if err := c.ensureConnection(); err != nil {
 		return false, err

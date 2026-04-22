@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/podman"
 )
 
@@ -144,6 +145,23 @@ func removeClusterData(logger *logrus.Logger, clusterName string, containers []s
 	}
 
 	logger.Info("Note: Overlay disks and cloud-init ISOs are stored in ephemeral container storage and removed automatically")
+
+	// Remove cluster-specific network
+	if clusterName != "" && clusterName != config.DefaultNetworkName {
+		logger.Infof("Removing cluster network: %s...", clusterName)
+		netMgr, err := network.NewManager()
+		if err != nil {
+			logger.Warnf("Failed to create network manager: %v", err)
+			errors = append(errors, err.Error())
+		} else {
+			if err := netMgr.Remove(ctx, clusterName); err != nil {
+				logger.Warnf("Failed to remove network: %v", err)
+				errors = append(errors, err.Error())
+			} else {
+				logger.Infof("Removed network: %s", clusterName)
+			}
+		}
+	}
 
 	if len(errors) > 0 {
 		return fmt.Errorf("encountered %d error(s) during cleanup", len(errors))

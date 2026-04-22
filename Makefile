@@ -92,7 +92,7 @@ GINKGO := $(shell which ginkgo 2>/dev/null || echo "$(HOME)/go/bin/ginkgo")
 test-integration:
 	@test -f ./$(BINK_BINARY) || (echo "Error: bink binary not found. Run 'make build-bink' first" && exit 1)
 	@echo "=== Running Integration Tests ==="
-	$(GINKGO) -v --procs=1 --randomize-all --randomize-suites test/integration/
+	$(GINKGO) -v --procs=2 --randomize-all --randomize-suites test/integration/
 
 test-integration-quick:
 	@test -f ./$(BINK_BINARY) || (echo "Error: bink binary not found. Run 'make build-bink' first" && exit 1)

@@ -40,12 +40,14 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
+	clusterName := viper.GetString("cluster.name")
+
 	logger.Info("Step 1: Creating cluster network...")
 	netMgr, err := network.NewManager()
 	if err != nil {
 		return fmt.Errorf("creating network manager: %w", err)
 	}
-	if err := netMgr.EnsureClusterNetwork(ctx); err != nil {
+	if err := netMgr.EnsureClusterNetwork(ctx, clusterName); err != nil {
 		return fmt.Errorf("ensuring cluster network: %w", err)
 	}
 	logger.Info("")
@@ -59,8 +61,6 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 		return fmt.Errorf("ensuring registry: %w", err)
 	}
 	logger.Info("")
-
-	clusterName := viper.GetString("cluster.name")
 
 	logger.Info("Step 3: Preparing cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{

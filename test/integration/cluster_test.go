@@ -10,7 +10,7 @@ import (
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
 
-var _ = Describe("Cluster Lifecycle", Serial, func() {
+var _ = Describe("Cluster Lifecycle", func() {
 	Describe("Single-Node Cluster Creation", func() {
 		var clusterName string
 
