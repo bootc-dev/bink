@@ -210,8 +210,7 @@ runcmd:
   - nmcli connection modify "cloud-init enp3s0" ipv4.dns-search "~%s %s"
   - nmcli connection up "cloud-init enp3s0"
 %s
-  - systemctl enable crio
-  - systemctl restart crio
+  - systemctl enable --now crio
   - systemctl enable kubelet
 `, n.Name, config.DefaultSSHUser, sshPubKey, dnsmasqConfig,
 		config.ClusterDomain, config.ClusterDomain, dnsmasqRuncmd)
