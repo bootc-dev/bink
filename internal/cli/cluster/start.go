@@ -28,7 +28,7 @@ func newStartCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&imagesImage, "images-image", "localhost/fedora-bootc-k8s-image:latest", "Container image containing base VM images")
-	cmd.Flags().IntVar(&apiPort, "api-port", 6443, "API server port to expose (0 = auto-assign random port)")
+	cmd.Flags().IntVar(&apiPort, "api-port", 0, "API server port to expose (0 = auto-assign random port)")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 8192 MB)")
 
 	return cmd
