@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -23,11 +24,11 @@ func newExposeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "expose",
 		Short: "Expose API server to localhost via published port",
-		Long: `Expose the Kubernetes API server to localhost via SSH tunnel.
+		Long: `Expose the Kubernetes API server to localhost via passt port forwarding.
 
 This command:
 1. Detects the published API server port on the host (e.g., 6443, 6444, or auto-assigned)
-2. Sets up an SSH tunnel from container:6443 to VM:6443
+2. Verifies the API server is reachable inside the container via passt port forwarding
 3. Generates a kubeconfig file configured to use localhost:<published-port>
 4. Requires the container to have port 6443 published (handled by 'bink cluster start')`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,10 +44,8 @@ This command:
 }
 
 func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigPath string) error {
-	// Build cluster-aware container name
 	clusterName := viper.GetString("cluster.name")
 
-	// Use cluster-specific kubeconfig path
 	defaultPath := filepath.Join(config.DefaultKubeconfigDir, "kubeconfig")
 	if kubeconfigPath == defaultPath {
 		kubeconfigPath = filepath.Join(config.DefaultKubeconfigDir, fmt.Sprintf("kubeconfig-%s", clusterName))
@@ -67,11 +66,9 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 		return fmt.Errorf("container %s does not exist", containerName)
 	}
 
-	// Get the published host port for the API server (6443/tcp inside container)
 	hostPort, err := podmanClient.GetPublishedPort(ctx, containerName, "6443/tcp")
 	if err != nil {
-		logger.Error("❌ Container does not have port 6443 published")
-		logger.Error("")
+		logger.Error("Container does not have port 6443 published")
 		logger.Errorf("The container needs to be created with a published API port")
 		logger.Error("This is handled automatically by 'bink cluster start'")
 		return fmt.Errorf("container missing port 6443 publication: %w", err)
@@ -80,59 +77,27 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 	logger.Infof("=== Exposing API server to localhost:%d ===", hostPort)
 	logger.Info("")
 	logger.Infof("Container port 6443 is published on host port %d", hostPort)
-	logger.Infof("SSH endpoint: localhost:%d (inside container)", config.DefaultSSHPort)
 
-	active, err := ssh.IsTunnelActive(ctx, containerName, "6443")
-	if err != nil {
-		return fmt.Errorf("checking tunnel status: %w", err)
+	logger.Info("Checking API server reachability via passt port forwarding...")
+
+	reachable := false
+	for i := 0; i < 5; i++ {
+		if checkAPIReachable(ctx, podmanClient, containerName) {
+			reachable = true
+			break
+		}
+		if i < 4 {
+			time.Sleep(2 * time.Second)
+		}
 	}
 
-	if active {
-		logger.Info("✓ Port 6443 is already being forwarded in container")
+	if reachable {
+		logger.Info("API server is reachable on container port 6443")
 	} else {
-		logger.Info("Starting SSH port forwarding inside container: 6443 -> VM:6443")
-
-		tunnelCfg := ssh.TunnelConfig{
-			ContainerName: containerName,
-			Host:          "localhost",
-			Port:          fmt.Sprintf("%d", config.DefaultSSHPort),
-			KeyPath:       config.ClusterKeyPath,
-			User:          config.DefaultSSHUser,
-			LocalPort:     "6443",
-			RemotePort:    "6443",
-			BindAddress:   "0.0.0.0",
-			Logger:        logger,
-			PodmanClient:  podmanClient,
-		}
-
-		if err := ssh.StartTunnel(ctx, tunnelCfg); err != nil {
-			return fmt.Errorf("starting SSH tunnel: %w", err)
-		}
-
-		logger.Info("Waiting for tunnel to establish...")
-		for i := 0; i < 5; i++ {
-			active, err := ssh.IsTunnelActive(ctx, containerName, "6443")
-			if err != nil {
-				return fmt.Errorf("verifying tunnel: %w", err)
-			}
-			if active {
-				break
-			}
-			if i == 4 {
-				return fmt.Errorf("tunnel did not establish after retries")
-			}
-		}
+		logger.Warn("API server is not yet reachable on container port 6443, continuing anyway")
 	}
 
-	active, err = ssh.IsTunnelActive(ctx, containerName, "6443")
-	if err != nil {
-		return fmt.Errorf("verifying tunnel: %w", err)
-	}
-	if !active {
-		return fmt.Errorf("SSH tunnel is not active on port 6443")
-	}
-
-	logger.Infof("✅ API server exposed: localhost:%d -> container:6443 -> VM:6443", hostPort)
+	logger.Infof("API server exposed: localhost:%d -> container:6443 (passt) -> VM:6443", hostPort)
 	logger.Info("")
 
 	logger.Infof("Generating kubeconfig at %s...", kubeconfigPath)
@@ -152,11 +117,9 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 		return fmt.Errorf("fetching kubeconfig from VM: %w", err)
 	}
 
-	// Replace the server URL with the actual published host port
 	lines := strings.Split(kubeconfigContent, "\n")
 	for i, line := range lines {
 		if strings.Contains(line, "server:") && strings.Contains(line, "https://") {
-			// Find where "server:" starts in the line to preserve indentation
 			serverIndex := strings.Index(line, "server:")
 			indent := line[:serverIndex]
 			lines[i] = fmt.Sprintf("%sserver: https://localhost:%d", indent, hostPort)
@@ -172,7 +135,7 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 		return fmt.Errorf("writing kubeconfig: %w", err)
 	}
 
-	logger.Infof("✅ Kubeconfig generated at %s", kubeconfigPath)
+	logger.Infof("Kubeconfig generated at %s", kubeconfigPath)
 	logger.Infof("   Server URL: https://localhost:%d", hostPort)
 	logger.Info("")
 	logger.Info("Usage:")
@@ -181,4 +144,11 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 	logger.Info("")
 
 	return nil
+}
+
+func checkAPIReachable(ctx context.Context, client *podman.Client, containerName string) bool {
+	err := client.ContainerExecQuiet(ctx, containerName, []string{
+		"bash", "-c", "echo > /dev/tcp/localhost/6443",
+	})
+	return err == nil
 }

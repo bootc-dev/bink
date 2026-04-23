@@ -237,9 +237,16 @@ func (n *Node) createVM(ctx context.Context) error {
 		XMLModifications: []string{
 			"xpath.set=./devices/interface[2]/source/@address=" + config.MulticastAddr,
 			fmt.Sprintf("xpath.set=./devices/interface[2]/source/@port=%d", config.MulticastPort),
-			// Set socket type and path for externally managed virtiofsd
 			fmt.Sprintf("xpath.set=./devices/filesystem/source/@socket=/var/lib/libvirt/qemu/domain-1-%s/fs0-fs.sock", n.Name),
 		},
+	}
+
+	if n.IsControlPlane {
+		opts.XMLModifications = append(opts.XMLModifications,
+			"xpath.create=./devices/interface[1]/portForward/range",
+			"xpath.set=./devices/interface[1]/portForward/range[2]/@start=6443",
+			"xpath.set=./devices/interface[1]/portForward/range[2]/@to=6443",
+		)
 	}
 
 	if err := n.virsh.VirtInstall(ctx, opts); err != nil {
