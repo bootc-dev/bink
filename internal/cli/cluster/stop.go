@@ -106,6 +106,7 @@ func runStop(ctx context.Context, logger *logrus.Logger, force, removeData bool)
 		} else {
 			logger.Info("✅ All cluster data removed")
 		}
+		logger.Info("Note: Shared registry (bink-registry) is preserved. Use 'bink registry stop' to remove it.")
 	}
 
 	return nil

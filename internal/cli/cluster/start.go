@@ -5,8 +5,10 @@ import (
 	"fmt"
 
 	"github.com/bootc-dev/bink/internal/cluster"
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/node"
+	"github.com/bootc-dev/bink/internal/registry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -48,9 +50,19 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 	}
 	logger.Info("")
 
+	logger.Info("Step 2: Ensuring local registry...")
+	registryMgr, err := registry.NewManager()
+	if err != nil {
+		return fmt.Errorf("creating registry manager: %w", err)
+	}
+	if err := registryMgr.EnsureRegistry(ctx); err != nil {
+		return fmt.Errorf("ensuring registry: %w", err)
+	}
+	logger.Info("")
+
 	clusterName := viper.GetString("cluster.name")
 
-	logger.Info("Step 2: Preparing cluster images volume...")
+	logger.Info("Step 3: Preparing cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{
 		Name:         clusterName,
 		ControlPlane: "node1",
@@ -62,7 +74,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 	}
 	logger.Info("")
 
-	logger.Info("Step 3: Creating control plane node (node1)...")
+	logger.Info("Step 4: Creating control plane node (node1)...")
 	logger.Infof("VM images container: %s", imagesImage)
 
 	// Convert 0 to -1 for auto-assign (to distinguish from unset)
@@ -94,7 +106,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 	}
 	logger.Info("")
 
-	logger.Info("Step 4: Initializing Kubernetes cluster...")
+	logger.Info("Step 5: Initializing Kubernetes cluster...")
 
 	if err := clusterMgr.Init(ctx, cluster.InitOptions{
 		NodeName: "node1",
@@ -104,6 +116,10 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 
 	logger.Info("")
 	logger.Info("✅ Cluster created successfully!")
+	logger.Info("")
+	logger.Info("Local registry:")
+	logger.Infof("  Push:  podman push --tls-verify=false localhost:%d/<image>:<tag>", config.RegistryPort)
+	logger.Infof("  Pull (in-cluster): %s.%s:%d/<image>:<tag>", config.RegistryHostname, config.ClusterDomain, config.RegistryPort)
 	logger.Info("")
 	logger.Info("Next steps:")
 	logger.Info("  ./bink api expose")
