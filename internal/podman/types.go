@@ -7,16 +7,17 @@ import (
 )
 
 type ContainerCreateOptions struct {
-	Name         string
-	Image        string
-	Network      string
-	Devices      []specs.LinuxDevice
-	Volumes      []*specgen.NamedVolume
-	Mounts       []specs.Mount
-	ImageVolumes []*specgen.ImageVolume
-	PortMappings []nettypes.PortMapping
-	Environment  map[string]string
-	Labels       map[string]string
-	CapAdd       []string
-	SelinuxOpts  []string
+	Name           string
+	Image          string
+	Network        string
+	NetworkOptions map[string]nettypes.PerNetworkOptions
+	Devices        []specs.LinuxDevice
+	Volumes        []*specgen.NamedVolume
+	Mounts         []specs.Mount
+	ImageVolumes   []*specgen.ImageVolume
+	PortMappings   []nettypes.PortMapping
+	Environment    map[string]string
+	Labels         map[string]string
+	CapAdd         []string
+	SelinuxOpts    []string
 }

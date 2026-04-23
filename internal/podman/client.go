@@ -183,7 +183,12 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 	spec.PortMappings = opts.PortMappings
 
 	// Configure network
-	if opts.Network != "" {
+	if opts.NetworkOptions != nil {
+		spec.NetNS = specgen.Namespace{
+			NSMode: specgen.Bridge,
+		}
+		spec.Networks = opts.NetworkOptions
+	} else if opts.Network != "" {
 		spec.NetNS = specgen.Namespace{
 			NSMode: specgen.Bridge,
 		}
@@ -205,6 +210,33 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 
 	logrus.Debugf("Container %s created and started with ID %s", opts.Name, createResponse.ID)
 	return createResponse.ID, nil
+}
+
+func (c *Client) ContainerStatus(ctx context.Context, name string) (string, error) {
+	if err := c.ensureConnection(); err != nil {
+		return "", err
+	}
+
+	data, err := containers.Inspect(c.conn, name, nil)
+	if err != nil {
+		return "", fmt.Errorf("inspecting container %s: %w", name, err)
+	}
+
+	return data.State.Status, nil
+}
+
+func (c *Client) ContainerStart(ctx context.Context, name string) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	logrus.Debugf("Starting container %s", name)
+
+	if err := containers.Start(c.conn, name, nil); err != nil {
+		return fmt.Errorf("starting container %s: %w", name, err)
+	}
+
+	return nil
 }
 
 func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string) (string, error) {
