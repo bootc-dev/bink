@@ -113,13 +113,15 @@ func (n *Node) writeUserData(dir, sshPubKey string) error {
     permissions: '0644'
     content: |
       %s %s %s.%s
+      %s %s %s.%s
   - path: /etc/systemd/system/dnsmasq.service.d/wait-for-network.conf
     content: |
       [Unit]
       After=network-online.target
       Wants=network-online.target
 `, n.ClusterIP, config.ClusterDomain, config.UpstreamDNS1, config.UpstreamDNS2,
-			n.ClusterIP, n.Name, n.Name, config.ClusterDomain)
+			n.ClusterIP, n.Name, n.Name, config.ClusterDomain,
+			config.RegistryStaticIP, config.RegistryHostname, config.RegistryHostname, config.ClusterDomain)
 
 		dnsmasqRuncmd = `  - chown dnsmasq:dnsmasq /var/lib/dnsmasq/cluster-hosts
   - restorecon -v /var/lib/dnsmasq/cluster-hosts || true
@@ -179,6 +181,19 @@ write_files:
     content: |
       [crio.runtime]
       add_inheritable_capabilities = true
+  - path: /etc/crio/crio.conf.d/03-local-registry.conf
+    content: |
+      [crio.image]
+      insecure_registries = ["%s:%d", "%s.%s:%d"]
+  - path: /etc/containers/registries.conf.d/10-local-registry.conf
+    content: |
+      [[registry]]
+      location = "%s:%d"
+      insecure = true
+
+      [[registry]]
+      location = "%s.%s:%d"
+      insecure = true
   - path: /etc/systemd/system/var-mnt-cluster_images.mount
     content: |
       [Unit]
@@ -212,7 +227,10 @@ runcmd:
 %s
   - systemctl enable --now crio
   - systemctl enable kubelet
-`, n.Name, config.DefaultSSHUser, sshPubKey, dnsmasqConfig,
+`, n.Name, config.DefaultSSHUser, sshPubKey,
+		config.RegistryStaticIP, config.RegistryPort, config.RegistryHostname, config.ClusterDomain, config.RegistryPort,
+		config.RegistryStaticIP, config.RegistryPort, config.RegistryHostname, config.ClusterDomain, config.RegistryPort,
+		dnsmasqConfig,
 		config.ClusterDomain, config.ClusterDomain, dnsmasqRuncmd)
 
 	return os.WriteFile(filepath.Join(dir, "user-data"), []byte(content), 0644)
