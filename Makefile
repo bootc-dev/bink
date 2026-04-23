@@ -87,7 +87,7 @@ clean-disk:
 rebuild: clean all
 
 # Test targets
-GINKGO := $(shell which ginkgo 2>/dev/null || echo "$(HOME)/go/bin/ginkgo")
+GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
 
 test-integration:
 	@test -f ./$(BINK_BINARY) || (echo "Error: bink binary not found. Run 'make build-bink' first" && exit 1)
