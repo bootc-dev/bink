@@ -7,6 +7,7 @@ import (
 	"github.com/bootc-dev/bink/internal/cli/api"
 	"github.com/bootc-dev/bink/internal/cli/cluster"
 	"github.com/bootc-dev/bink/internal/cli/node"
+	"github.com/bootc-dev/bink/internal/cli/registry"
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -60,6 +61,7 @@ func init() {
 	rootCmd.AddCommand(cluster.NewClusterCmd())
 	rootCmd.AddCommand(node.NewNodeCmd())
 	rootCmd.AddCommand(api.NewAPICmd())
+	rootCmd.AddCommand(registry.NewRegistryCmd())
 }
 
 func initConfig() {
