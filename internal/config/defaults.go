@@ -43,6 +43,13 @@ const (
 	UpstreamDNS1      = "8.8.8.8"
 	UpstreamDNS2      = "8.8.4.4"
 
+	RegistryContainerName = "bink-registry"
+	RegistryImage         = "docker.io/library/registry:2"
+	RegistryPort          = 5000
+	RegistryStaticIP      = "10.88.0.2"
+	RegistryHostname      = "registry"
+	RegistryVolume        = "bink-registry-data"
+
 	CloudInitVolID = "cidata"
 
 	DefaultSSHTimeout       = 60
