@@ -44,6 +44,26 @@ func CleanupKubeconfig(kubeconfigPath string) {
 	os.Remove(kubeconfigPath)
 }
 
+// RemoveControlPlaneTaint removes the NoSchedule taint from a control-plane node
+// so that workloads can be scheduled on single-node clusters.
+func RemoveControlPlaneTaint(client *kubernetes.Clientset, nodeName string) {
+	GinkgoWriter.Printf("Removing control-plane taint from node %s\n", nodeName)
+	node, err := client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred(), "Failed to get node %s", nodeName)
+
+	var filtered []corev1.Taint
+	for _, t := range node.Spec.Taints {
+		if t.Key == "node-role.kubernetes.io/control-plane" && t.Effect == corev1.TaintEffectNoSchedule {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+	node.Spec.Taints = filtered
+
+	_, err = client.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+	Expect(err).ToNot(HaveOccurred(), "Failed to update node %s", nodeName)
+}
+
 // WaitForNodeReady polls until the target node shows Ready status.
 func WaitForNodeReady(client *kubernetes.Clientset, targetNodeName string, timeout time.Duration) {
 	GinkgoWriter.Printf("Waiting for node %s to become Ready (timeout: %s)\n", targetNodeName, timeout)

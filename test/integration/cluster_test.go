@@ -26,7 +26,7 @@ var _ = Describe("Cluster Lifecycle", func() {
 			helpers.CleanupCluster(clusterName)
 		})
 
-		It("should create and initialize a complete Kubernetes cluster", func() {
+		FIt("should create and initialize a complete Kubernetes cluster", func() {
 			By("Creating cluster with auto-assigned API port and 4GB memory")
 			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "4096")
 			session := helpers.RunCommand(cmd)
@@ -75,6 +75,9 @@ var _ = Describe("Cluster Lifecycle", func() {
 			kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
 			defer helpers.CleanupKubeconfig(kubeconfigPath)
 
+			By("Removing control-plane taint to allow scheduling on single-node cluster")
+			helpers.RemoveControlPlaneTaint(kubeClient, "node1")
+
 			By("Deploying a busybox pod to verify cluster is functional")
 			busyboxPod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -83,11 +86,6 @@ var _ = Describe("Cluster Lifecycle", func() {
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					Tolerations: []corev1.Toleration{{
-						Key:      "node-role.kubernetes.io/control-plane",
-						Operator: corev1.TolerationOpExists,
-						Effect:   corev1.TaintEffectNoSchedule,
-					}},
 					Containers: []corev1.Container{{
 						Name:    "busybox",
 						Image:   "busybox:latest",

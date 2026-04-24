@@ -31,6 +31,9 @@ var _ = Describe("Kubernetes Workloads", func() {
 		kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
 		defer helpers.CleanupKubeconfig(kubeconfigPath)
 
+		By("Removing control-plane taint to allow scheduling on single-node cluster")
+		helpers.RemoveControlPlaneTaint(kubeClient, "node1")
+
 		By("Deploying an nginx pod")
 		nginxPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -39,11 +42,6 @@ var _ = Describe("Kubernetes Workloads", func() {
 			},
 			Spec: corev1.PodSpec{
 				RestartPolicy: corev1.RestartPolicyNever,
-				Tolerations: []corev1.Toleration{{
-					Key:      "node-role.kubernetes.io/control-plane",
-					Operator: corev1.TolerationOpExists,
-					Effect:   corev1.TaintEffectNoSchedule,
-				}},
 				Containers: []corev1.Container{{
 					Name:  "nginx",
 					Image: "nginx:latest",
@@ -75,10 +73,6 @@ spec:
       labels:
         app: nginx-deploy
     spec:
-      tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
       containers:
       - name: nginx
         image: nginx:latest
@@ -122,6 +116,9 @@ spec:
 		kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
 		defer helpers.CleanupKubeconfig(kubeconfigPath)
 
+		By("Removing control-plane taint to allow DaemonSet on all nodes")
+		helpers.RemoveControlPlaneTaint(kubeClient, "node1")
+
 		By("Waiting for all nodes to be Ready")
 		helpers.WaitForNodeReady(kubeClient, "node1", 3*time.Minute)
 		helpers.WaitForNodeReady(kubeClient, "node2", 3*time.Minute)
@@ -142,10 +139,6 @@ spec:
       labels:
         app: spread-test
     spec:
-      tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
       containers:
       - name: busybox
         image: busybox:latest
