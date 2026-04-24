@@ -1,0 +1,5 @@
+FROM quay.io/fedora/fedora:43
+
+RUN dnf install -y -q skopeo && dnf clean all
+RUN echo 'root:100000:65536' > /etc/subuid && \
+    echo 'root:100000:65536' > /etc/subgid

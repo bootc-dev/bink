@@ -8,6 +8,7 @@ const (
 	DefaultBootcImage       = "localhost/fedora-bootc-k8s:latest"
 	DefaultBootcImagesImage = "localhost/fedora-bootc-k8s-image:latest"
 	DefaultBaseImage        = "quay.io/fedora/fedora:43"
+	DefaultPopulatorImage   = "localhost/cluster-images-populator:latest"
 
 	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"
 	DefaultMemory   = 8192

@@ -1,9 +1,10 @@
-.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container clean clean-disk rebuild help test-integration test-integration-quick test-unit test-all
+.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick test-unit test-all
 
 # Image names and tags
 BOOTC_IMAGE := localhost/fedora-bootc-k8s:latest
 CLUSTER_IMAGE := localhost/cluster:latest
 IMAGES_CONTAINER := localhost/fedora-bootc-k8s-image:latest
+POPULATOR_IMAGE := localhost/cluster-images-populator:latest
 DISK_IMAGE := fedora-bootc-k8s.qcow2
 DISK_SIZE := 10G
 
@@ -13,6 +14,7 @@ BINK_BINARY := bink
 # Directories
 IMAGES_DIR := containerfiles/images
 VM_DIR := containerfiles/vm
+POPULATOR_DIR := containerfiles/populator
 OUTPUT_DIR := vm/images
 
 all: build-cluster-image build-vm-image build-disk build-images-container build-bink
@@ -70,10 +72,16 @@ build-images-container: build-disk
 	@echo ""
 	@echo "This image can be used with: bink cluster start --images-image $(IMAGES_CONTAINER)"
 
+# Build the populator image (skopeo pre-installed for fast volume population)
+build-populator-image:
+	@echo "=== Building cluster images populator ==="
+	podman build -t $(POPULATOR_IMAGE) -f $(POPULATOR_DIR)/Containerfile $(POPULATOR_DIR)
+	@echo "✅ Populator image built: $(POPULATOR_IMAGE)"
+
 # Clean built images and disk
 clean:
 	@echo "=== Cleaning up ==="
-	podman rmi -f $(BOOTC_IMAGE) $(CLUSTER_IMAGE) $(IMAGES_CONTAINER) 2>/dev/null || true
+	podman rmi -f $(BOOTC_IMAGE) $(CLUSTER_IMAGE) $(IMAGES_CONTAINER) $(POPULATOR_IMAGE) 2>/dev/null || true
 	rm -f $(OUTPUT_DIR)/$(DISK_IMAGE)
 	@echo "✅ Cleaned up images and disk"
 
@@ -117,6 +125,7 @@ help:
 	@echo "  build-cluster-image      - Build the cluster container image"
 	@echo "  build-disk               - Convert bootc image to qcow2 disk image"
 	@echo "  build-images-container   - Build container with qcow2 disk for image volume"
+	@echo "  build-populator-image    - Build the cluster images populator image (skopeo)"
 	@echo ""
 	@echo "Clean Targets:"
 	@echo "  clean                    - Remove all built images and disk"

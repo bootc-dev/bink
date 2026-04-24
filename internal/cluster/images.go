@@ -124,7 +124,7 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 
 	opts := &podman.ContainerCreateOptions{
 		Name:    tmpContainer,
-		Image:   config.DefaultBaseImage,
+		Image:   config.DefaultPopulatorImage,
 		Command: []string{"sleep", "infinity"},
 		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
 	}
@@ -138,20 +138,6 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 		logrus.Debugf("Cleaning up populator container %s", tmpContainer)
 		c.podmanClient.ContainerRemove(ctx, tmpContainer, true)
 	}()
-
-	logrus.Info("Installing container tools in temporary container...")
-	if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
-		[]string{"dnf", "install", "-y", "-q", "skopeo", "podman"}); err != nil {
-		return fmt.Errorf("installing container tools: %w", err)
-	}
-
-	logrus.Debug("Configuring storage for image extraction...")
-	if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
-		[]string{"sh", "-c", "echo 'root:100000:65536' > /etc/subuid && " +
-			"echo 'root:100000:65536' > /etc/subgid && " +
-			"podman system migrate 2>/dev/null || true"}); err != nil {
-		logrus.Debug("Storage configuration completed with warnings")
-	}
 
 	// Pull each image using skopeo
 	for i, image := range images {
