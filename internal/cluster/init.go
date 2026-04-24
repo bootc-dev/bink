@@ -116,10 +116,11 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	c.logger.Info("")
 
-	// Install Calico CNI
+	// Install Calico CNI (use quay.io images instead of docker.io to match pre-pulled images)
 	c.logger.Info("=== Installing Calico CNI plugin ===")
 	calicoURL := fmt.Sprintf("https://raw.githubusercontent.com/projectcalico/calico/%s/manifests/calico.yaml", calicoVersion)
-	if _, err := sshClient.Exec(ctx, fmt.Sprintf("kubectl apply -f %s", calicoURL)); err != nil {
+	calicoApplyCmd := fmt.Sprintf("curl -sL %s | sed 's|docker.io/calico/|quay.io/calico/|g' | kubectl apply -f -", calicoURL)
+	if _, err := sshClient.Exec(ctx, calicoApplyCmd); err != nil {
 		return fmt.Errorf("failed to install Calico: %w", err)
 	}
 

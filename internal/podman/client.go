@@ -192,6 +192,7 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 	// Create spec generator
 	spec := specgen.NewSpecGenerator(opts.Image, false)
 	spec.Name = opts.Name
+	spec.Command = opts.Command
 	spec.Env = opts.Environment
 	spec.Labels = opts.Labels
 	spec.CapAdd = opts.CapAdd

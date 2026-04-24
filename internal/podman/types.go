@@ -9,6 +9,7 @@ import (
 type ContainerCreateOptions struct {
 	Name           string
 	Image          string
+	Command        []string
 	Network        string
 	NetworkOptions map[string]nettypes.PerNetworkOptions
 	Devices        []specs.LinuxDevice

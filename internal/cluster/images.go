@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -100,35 +99,19 @@ func (c *Cluster) isVolumePopulated(ctx context.Context, volumeName string) (boo
 }
 
 func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) error {
-	logrus.Info("Pre-pulling Kubernetes images into volume...")
+	logrus.Info("Pre-pulling Kubernetes and Calico images into volume...")
 
-	k8sVersion := "v1.35.0"
-
-	// Try to get image list from kubeadm in the bootc image
-	// If that fails, fall back to hardcoded list
-	var images []string
-
-	output, err := c.podmanClient.ContainerRunOutput(ctx,
-		"localhost/fedora-bootc-k8s:latest",
-		[]string{"kubeadm", "config", "images", "list", "--kubernetes-version", k8sVersion},
-		nil,
-	)
-	if err != nil {
-		logrus.Warnf("Could not get image list from kubeadm: %v", err)
-		logrus.Info("Using hardcoded image list for Kubernetes v1.35.0")
-
-		// Hardcoded image list for Kubernetes v1.35.0
-		images = []string{
-			"registry.k8s.io/kube-apiserver:v1.35.0",
-			"registry.k8s.io/kube-controller-manager:v1.35.0",
-			"registry.k8s.io/kube-scheduler:v1.35.0",
-			"registry.k8s.io/kube-proxy:v1.35.0",
-			"registry.k8s.io/coredns/coredns:v1.11.1",
-			"registry.k8s.io/pause:3.10",
-			"registry.k8s.io/etcd:3.5.16-0",
-		}
-	} else {
-		images = strings.Split(strings.TrimSpace(output), "\n")
+	images := []string{
+		"registry.k8s.io/kube-apiserver:v1.35.0",
+		"registry.k8s.io/kube-controller-manager:v1.35.0",
+		"registry.k8s.io/kube-scheduler:v1.35.0",
+		"registry.k8s.io/kube-proxy:v1.35.0",
+		"registry.k8s.io/coredns/coredns:v1.11.1",
+		"registry.k8s.io/pause:3.10",
+		"registry.k8s.io/etcd:3.5.16-0",
+		"quay.io/calico/cni:" + calicoVersion,
+		"quay.io/calico/node:" + calicoVersion,
+		"quay.io/calico/kube-controllers:" + calicoVersion,
 	}
 
 	logrus.Infof("Found %d images to pull", len(images))
@@ -142,10 +125,11 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 	opts := &podman.ContainerCreateOptions{
 		Name:    tmpContainer,
 		Image:   config.DefaultBaseImage,
+		Command: []string{"sleep", "infinity"},
 		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
 	}
 
-	_, err = c.podmanClient.ContainerCreate(ctx, opts)
+	_, err := c.podmanClient.ContainerCreate(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("starting populator container (another process may be populating): %w", err)
 	}
