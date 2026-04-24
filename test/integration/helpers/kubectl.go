@@ -91,8 +91,18 @@ func GetNodeCount(client *kubernetes.Clientset) int {
 	return len(nodes.Items)
 }
 
+// WaitForServiceAccount polls until the named service account exists in the namespace.
+func WaitForServiceAccount(client *kubernetes.Clientset, namespace, name string, timeout time.Duration) {
+	GinkgoWriter.Printf("Waiting for service account %s/%s (timeout: %s)\n", namespace, name, timeout)
+	Eventually(func() bool {
+		_, err := client.CoreV1().ServiceAccounts(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		return err == nil
+	}, timeout, 5*time.Second).Should(BeTrue(), "Service account %s/%s should exist", namespace, name)
+}
+
 // CreatePod creates a pod from the given spec and waits for it to be Running.
 func CreatePod(client *kubernetes.Clientset, namespace string, pod *corev1.Pod, timeout time.Duration) {
+	WaitForServiceAccount(client, namespace, "default", 2*time.Minute)
 	_, err := client.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred(), "Failed to create pod %s", pod.Name)
 	WaitForPodReady(client, namespace, fmt.Sprintf("run=%s", pod.Name), timeout)
@@ -109,6 +119,7 @@ func ApplyDeployment(client *kubernetes.Clientset, namespace, manifest string) *
 	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(manifest), 4096).Decode(deployment)
 	Expect(err).ToNot(HaveOccurred(), "Failed to parse deployment manifest")
 
+	WaitForServiceAccount(client, namespace, "default", 2*time.Minute)
 	created, err := client.AppsV1().Deployments(namespace).Create(context.Background(), deployment, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred(), "Failed to create deployment %s", deployment.Name)
 	return created
