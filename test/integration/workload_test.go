@@ -44,8 +44,8 @@ var _ = Describe("Kubernetes Workloads", func() {
 				RestartPolicy: corev1.RestartPolicyNever,
 				Containers: []corev1.Container{{
 					Name:  "nginx",
-					Image: "nginx:latest",
-					Ports: []corev1.ContainerPort{{ContainerPort: 80}},
+					Image: "quay.io/fedora/nginx-126:latest",
+					Ports: []corev1.ContainerPort{{ContainerPort: 8080}},
 				}},
 			},
 		}
@@ -75,9 +75,9 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:latest
+        image: quay.io/fedora/nginx-126:latest
         ports:
-        - containerPort: 80
+        - containerPort: 8080
 `)
 
 		By("Creating a ClusterIP Service")
@@ -91,7 +91,7 @@ spec:
     app: nginx-deploy
   ports:
   - port: 80
-    targetPort: 80
+    targetPort: 8080
 `)
 
 		By("Waiting for the deployment pod to become ready")
