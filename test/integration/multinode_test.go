@@ -23,7 +23,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 		helpers.CleanupCluster(clusterName)
 	})
 
-	It("should add worker nodes and scale the cluster", Serial, func() {
+	It("should add worker nodes and scale the cluster", func() {
 		By("Creating a single-node cluster")
 		helpers.CreateCluster(clusterName)
 
