@@ -30,11 +30,11 @@ var _ = Describe("Multi-Cluster Operations", func() {
 		helpers.CreateCluster(clusterNameB)
 
 		By("Verifying both clusters have running containers")
-		containerA := helpers.GetContainer(fmt.Sprintf("k8s-%s-node1", clusterNameA))
+		containerA := helpers.GetContainer(helpers.NodeContainerName(clusterNameA, "node1"))
 		Expect(containerA).ToNot(BeNil(), "Cluster A container should exist")
 		Expect(containerA.State).To(Equal("running"), "Cluster A container should be running")
 
-		containerB := helpers.GetContainer(fmt.Sprintf("k8s-%s-node1", clusterNameB))
+		containerB := helpers.GetContainer(helpers.NodeContainerName(clusterNameB, "node1"))
 		Expect(containerB).ToNot(BeNil(), "Cluster B container should exist")
 		Expect(containerB.State).To(Equal("running"), "Cluster B container should be running")
 
@@ -63,10 +63,10 @@ var _ = Describe("Multi-Cluster Operations", func() {
 		Expect(stopSession.ExitCode()).To(Equal(0))
 
 		By("Verifying first cluster container is removed")
-		Expect(helpers.ContainerExists(fmt.Sprintf("k8s-%s-node1", clusterNameA))).To(BeFalse(), "Cluster A container should be removed")
+		Expect(helpers.ContainerExists(helpers.NodeContainerName(clusterNameA, "node1"))).To(BeFalse(), "Cluster A container should be removed")
 
 		By("Verifying second cluster is still running")
-		containerB = helpers.GetContainer(fmt.Sprintf("k8s-%s-node1", clusterNameB))
+		containerB = helpers.GetContainer(helpers.NodeContainerName(clusterNameB, "node1"))
 		Expect(containerB).ToNot(BeNil(), "Cluster B container should still exist")
 		Expect(containerB.State).To(Equal("running"), "Cluster B container should still be running")
 

@@ -35,7 +35,7 @@ var _ = Describe("Cluster Lifecycle", func() {
 			Expect(session.ExitCode()).To(Equal(0))
 
 			By("Verifying container exists and is running")
-			containerName := fmt.Sprintf("k8s-%s-node1", clusterName)
+			containerName := helpers.NodeContainerName(clusterName, "node1")
 			container := helpers.GetContainer(containerName)
 			Expect(container).ToNot(BeNil(), "Container %s should exist", containerName)
 			Expect(container.State).To(Equal("running"), "Container should be running")
@@ -142,7 +142,7 @@ var _ = Describe("Cluster Lifecycle", func() {
 			Expect(stopSession.ExitCode()).To(Equal(0))
 
 			By("Verifying container is removed")
-			containerName := fmt.Sprintf("k8s-%s-node1", clusterName)
+			containerName := helpers.NodeContainerName(clusterName, "node1")
 			Expect(helpers.ContainerExists(containerName)).To(BeFalse(), "Container should be removed after stop --remove-data")
 
 			By("Verifying cluster-keys volume is removed")

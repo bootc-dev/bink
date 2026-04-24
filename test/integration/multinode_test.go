@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,7 +34,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 		helpers.AddNode(clusterName, "node2", "--role", "worker")
 
 		By("Verifying node2 container is running")
-		containerName2 := fmt.Sprintf("k8s-%s-node2", clusterName)
+		containerName2 := helpers.NodeContainerName(clusterName, "node2")
 		container2 := helpers.GetContainer(containerName2)
 		Expect(container2).ToNot(BeNil(), "Container %s should exist", containerName2)
 		Expect(container2.State).To(Equal("running"), "Container should be running")
@@ -78,7 +77,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 
 		By("Verifying all three containers are running")
 		for _, nodeName := range []string{"node1", "node2", "node3"} {
-			cn := fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
+			cn := helpers.NodeContainerName(clusterName, nodeName)
 			c := helpers.GetContainer(cn)
 			Expect(c).ToNot(BeNil(), "Container %s should exist", cn)
 			Expect(c.State).To(Equal("running"), "Container %s should be running", cn)
@@ -122,7 +121,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 
 		By("Verifying both containers are running")
 		for _, nodeName := range []string{"node1", "node2"} {
-			cn := fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
+			cn := helpers.NodeContainerName(clusterName, nodeName)
 			c := helpers.GetContainer(cn)
 			Expect(c).ToNot(BeNil(), "Container %s should exist", cn)
 			Expect(c.State).To(Equal("running"), "Container %s should be running", cn)

@@ -76,6 +76,11 @@ func CleanupCluster(name string) {
 	_ = session
 }
 
+// NodeContainerName returns the container name for a node in a cluster.
+func NodeContainerName(clusterName, nodeName string) string {
+	return fmt.Sprintf("k8s-%s-%s", clusterName, nodeName)
+}
+
 // ExposeAPI exposes the API server and generates kubeconfig
 func ExposeAPI(clusterName, kubeconfigPath string) {
 	GinkgoWriter.Printf("Exposing API for cluster: %s\n", clusterName)
