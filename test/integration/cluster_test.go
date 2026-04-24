@@ -88,7 +88,7 @@ var _ = Describe("Cluster Lifecycle", func() {
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{{
 						Name:    "busybox",
-						Image:   "busybox:latest",
+						Image:   "quay.io/libpod/busybox:latest",
 						Command: []string{"sleep", "3600"},
 					}},
 				},

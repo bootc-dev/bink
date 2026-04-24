@@ -141,7 +141,7 @@ spec:
     spec:
       containers:
       - name: busybox
-        image: busybox:latest
+        image: quay.io/libpod/busybox:latest
         command: ["sleep", "3600"]
 `)
 
