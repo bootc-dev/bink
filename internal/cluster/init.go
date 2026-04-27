@@ -21,6 +21,7 @@ nodeRegistration:
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
 kubernetesVersion: "%s"
+controlPlaneEndpoint: "%s:6443"
 apiServer:
   certSANs:
   - "localhost"
@@ -146,7 +147,7 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 // createKubeadmConfig creates the kubeadm config file in the container
 func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string, advertiseAddress string) error {
-	kubeadmConfig := fmt.Sprintf(kubeadmConfigTemplate, advertiseAddress, config.KubernetesVersion)
+	kubeadmConfig := fmt.Sprintf(kubeadmConfigTemplate, advertiseAddress, config.KubernetesVersion, advertiseAddress)
 	cmd := fmt.Sprintf("podman exec %s bash -c 'cat > /tmp/kubeadm-config.yaml << \"KUBEADM\"\n%sKUBEADM\n'", containerName, kubeadmConfig)
 
 	execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)

@@ -58,11 +58,17 @@ func runAdd(ctx context.Context, nodeName, controlPlane, imagesImage, role strin
 	logger.Infof("VM images container: %s", imagesImage)
 
 	clusterName := viper.GetString("cluster.name")
-	newNode, err := node.New(nodeName, isControlPlane,
+
+	nodeOpts := []node.NodeOption{
 		node.WithImagesImage(imagesImage),
 		node.WithClusterName(clusterName),
 		node.WithMemory(memory),
-	)
+	}
+	if isControlPlane {
+		nodeOpts = append(nodeOpts, node.WithAPIPort(-1))
+	}
+
+	newNode, err := node.New(nodeName, isControlPlane, nodeOpts...)
 	if err != nil {
 		return fmt.Errorf("creating node: %w", err)
 	}

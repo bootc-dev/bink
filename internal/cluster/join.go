@@ -63,9 +63,25 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 	// Create SSH client for the new node
 	nodeSSHClient := ssh.NewClientForNode(c.name, nodeName, c.logger)
 
+	// For control-plane joins, set the advertise address to the node's cluster IP
+	// so the API server binds to the cluster network interface
+	if opts.IsControlPlane {
+		nodeClusterIP := c.GetNodeClusterIP(nodeName)
+		joinCommand = fmt.Sprintf("%s --apiserver-advertise-address %s", joinCommand, nodeClusterIP)
+	}
+
 	// Execute join command
 	if err := nodeSSHClient.ExecWithOutput(ctx, fmt.Sprintf("sudo %s", joinCommand)); err != nil {
 		return fmt.Errorf("failed to join node: %w", err)
+	}
+
+	// Set up kubectl for control-plane nodes
+	if opts.IsControlPlane {
+		c.logger.Info("")
+		c.logger.Infof("=== Setting up kubectl on %s ===", nodeName)
+		if _, err := nodeSSHClient.Exec(ctx, "mkdir -p $HOME/.kube && sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config && sudo chown $(id -u):$(id -g) $HOME/.kube/config"); err != nil {
+			c.logger.Warnf("Failed to setup kubectl on %s (non-fatal): %v", nodeName, err)
+		}
 	}
 
 	// Label worker nodes with the worker role
