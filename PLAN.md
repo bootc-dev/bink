@@ -122,3 +122,21 @@ insecure = true
 
 bink uses Podman Go bindings (`github.com/containers/podman/v6/pkg/bindings`) for all container operations.
 
+## TODOs
+
+### Replace virt-install with Libvirt Go Bindings
+
+Currently, `internal/virsh/client.go` shells out to `virt-install`, `virsh`, and `qemu-img` inside the container via `podman exec`. Replace these with the libvirt Go bindings (`libvirt.org/go/libvirt`) to manage VM lifecycle (define, start, destroy, undefine) programmatically and generate domain XML as Go structs instead of building CLI argument lists.
+
+### Replace SSH/SCP Shell-outs with Go SSH Bindings
+
+Currently, `internal/ssh/ssh.go` shells out to `ssh` and `scp` binaries inside the container via `podman exec`. Replace these with `golang.org/x/crypto/ssh` (and `github.com/pkg/sftp` for file transfers) to eliminate the binary dependency, enable connection reuse, and get native Go error handling. The `ssh-keygen` call in `internal/node/create.go` should also be replaced with `crypto/rsa` + `golang.org/x/crypto/ssh` for pure-Go key generation.
+
+### Fix Multi Control Plane Support
+
+Adding multiple control-plane nodes (`--role control-plane`) is not working properly. This needs to be investigated and fixed to support highly available Kubernetes clusters.
+
+### Centralize Hardcoded Images
+
+Image references are scattered across `internal/config/defaults.go`, `internal/cluster/init.go`, `internal/cluster/images.go`, Containerfiles, and test files. Centralize all image references (including Calico version `v3.27.0`, base Fedora `quay.io/fedora/fedora:43`, registry `docker.io/library/registry:2`, and test images like `quay.io/libpod/busybox:latest`) into a single configuration source so they can be updated in one place.
+
