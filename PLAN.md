@@ -138,6 +138,10 @@ Currently dnsmasq runs exclusively on node1, configured via cloud-init during cl
 
 The DNS service should be moved out of node1 so that cluster name resolution is not dependent on a single node's availability.
 
+### Add Unit Tests
+
+The project currently has no unit tests. Add comprehensive unit tests for core internal packages. Tests should use table-driven style and run via `make test-unit` (`go test -v -race ./internal/...`).
+
 ### Centralize Hardcoded Images
 
 Image references are scattered across `internal/config/defaults.go`, `internal/cluster/init.go`, `internal/cluster/images.go`, Containerfiles, and test files. Centralize all image references (including Calico version `v3.27.0`, base Fedora `quay.io/fedora/fedora:43`, registry `docker.io/library/registry:2`, and test images like `quay.io/libpod/busybox:latest`) into a single configuration source so they can be updated in one place.

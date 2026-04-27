@@ -1,4 +1,4 @@
-.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick test-unit test-all update-calico
+.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick update-calico
 
 # Image names and tags
 BOOTC_IMAGE := localhost/fedora-bootc-k8s:latest
@@ -120,13 +120,6 @@ test-integration-quick:
 	@echo "=== Running Quick Integration Tests ==="
 	$(GINKGO) -v --focus="quick" test/integration/
 
-test-unit:
-	@echo "=== Running Unit Tests ==="
-	go test -v -race ./internal/...
-
-test-all: test-unit test-integration
-	@echo "✅ All tests passed"
-
 help:
 	@echo "Makefile for building bootc images, cluster images, and bink CLI"
 	@echo ""
@@ -151,8 +144,6 @@ help:
 	@echo "Test Targets:"
 	@echo "  test-integration         - Run all integration tests"
 	@echo "  test-integration-quick   - Run quick integration tests only"
-	@echo "  test-unit                - Run unit tests"
-	@echo "  test-all                 - Run both unit and integration tests"
 	@echo ""
 	@echo "Outputs:"
 	@echo "  Binary:         $(BINK_BINARY)"
