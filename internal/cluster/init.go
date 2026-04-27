@@ -23,8 +23,6 @@ type kubeadmConfigParams struct {
 	KubernetesVersion string
 }
 
-const calicoVersion = "v3.27.0"
-
 // InitOptions holds options for cluster initialization
 type InitOptions struct {
 	NodeName string
@@ -102,8 +100,7 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	// Install Calico CNI (use quay.io images instead of docker.io to match pre-pulled images)
 	c.logger.Info("=== Installing Calico CNI plugin ===")
-	calicoURL := fmt.Sprintf("https://raw.githubusercontent.com/projectcalico/calico/%s/manifests/calico.yaml", calicoVersion)
-	calicoApplyCmd := fmt.Sprintf("curl -sL %s | sed 's|docker.io/calico/|quay.io/calico/|g' | kubectl apply -f -", calicoURL)
+	calicoApplyCmd := fmt.Sprintf("curl -sL %s | sed 's|docker.io/calico/|quay.io/calico/|g' | kubectl apply -f -", config.DefaultCNIManifest)
 	if _, err := sshClient.Exec(ctx, calicoApplyCmd); err != nil {
 		return fmt.Errorf("failed to install Calico: %w", err)
 	}

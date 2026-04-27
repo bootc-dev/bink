@@ -132,9 +132,9 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 
 	// Add Calico CNI images
 	images = append(images,
-		"quay.io/calico/cni:"+calicoVersion,
-		"quay.io/calico/node:"+calicoVersion,
-		"quay.io/calico/kube-controllers:"+calicoVersion,
+		"quay.io/calico/cni:"+config.CalicoVersion,
+		"quay.io/calico/node:"+config.CalicoVersion,
+		"quay.io/calico/kube-controllers:"+config.CalicoVersion,
 	)
 
 	logrus.Infof("Found %d images to pull", len(images))

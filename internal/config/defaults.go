@@ -35,7 +35,8 @@ const (
 
 	KubernetesVersion = "v1.35.0"
 
-	DefaultCNIManifest = "https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml"
+	CalicoVersion      = "v3.27.0"
+	DefaultCNIManifest = "https://raw.githubusercontent.com/projectcalico/calico/" + CalicoVersion + "/manifests/calico.yaml"
 	DefaultKubeconfigDir = "."
 
 	ContainerNamePrefix = "k8s-"
