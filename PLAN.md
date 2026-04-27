@@ -142,3 +142,7 @@ The DNS service should be moved out of node1 so that cluster name resolution is 
 
 Image references are scattered across `internal/config/defaults.go`, `internal/cluster/init.go`, `internal/cluster/images.go`, Containerfiles, and test files. Centralize all image references (including Calico version `v3.27.0`, base Fedora `quay.io/fedora/fedora:43`, registry `docker.io/library/registry:2`, and test images like `quay.io/libpod/busybox:latest`) into a single configuration source so they can be updated in one place.
 
+### Replace SSH+kubectl with Kubernetes Client-Go
+
+Currently, `internal/cluster/init.go` and `internal/cluster/join.go` run `kubectl` commands via SSH to apply the Calico CNI manifest, patch CoreDNS, and label worker nodes. Replace these with direct Kubernetes API calls using `k8s.io/client-go` by creating an `internal/kube` package.
+
