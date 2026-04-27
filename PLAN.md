@@ -136,6 +136,12 @@ Currently, `internal/ssh/ssh.go` shells out to `ssh` and `scp` binaries inside t
 
 Adding multiple control-plane nodes (`--role control-plane`) is not working properly. This needs to be investigated and fixed to support highly available Kubernetes clusters.
 
+### Decouple DNS from Node1
+
+Currently dnsmasq runs exclusively on node1, configured via cloud-init during cluster creation. All other nodes point their DNS at node1's cluster IP (`10.0.0.x`). This means, if node1 is rebooted or temporarily unavailable, all cluster DNS resolution breaks for other nodes
+
+The DNS service should be moved out of node1 so that cluster name resolution is not dependent on a single node's availability.
+
 ### Centralize Hardcoded Images
 
 Image references are scattered across `internal/config/defaults.go`, `internal/cluster/init.go`, `internal/cluster/images.go`, Containerfiles, and test files. Centralize all image references (including Calico version `v3.27.0`, base Fedora `quay.io/fedora/fedora:43`, registry `docker.io/library/registry:2`, and test images like `quay.io/libpod/busybox:latest`) into a single configuration source so they can be updated in one place.
