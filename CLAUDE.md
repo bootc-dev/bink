@@ -248,9 +248,6 @@ Host (podman)
 ## Running Tests
 
 ```bash
-# Unit tests
-make test-unit
-
 # Integration tests (requires built bink binary and container images)
 make build-bink-container    # build binary first
 make test-integration        # full suite
