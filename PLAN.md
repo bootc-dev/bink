@@ -132,10 +132,6 @@ Currently, `internal/virsh/client.go` shells out to `virt-install`, `virsh`, and
 
 Currently, `internal/ssh/ssh.go` shells out to `ssh` and `scp` binaries inside the container via `podman exec`. Replace these with `golang.org/x/crypto/ssh` (and `github.com/pkg/sftp` for file transfers) to eliminate the binary dependency, enable connection reuse, and get native Go error handling. The `ssh-keygen` call in `internal/node/create.go` should also be replaced with `crypto/rsa` + `golang.org/x/crypto/ssh` for pure-Go key generation.
 
-### Fix Multi Control Plane Support
-
-Adding multiple control-plane nodes (`--role control-plane`) is not working properly. This needs to be investigated and fixed to support highly available Kubernetes clusters.
-
 ### Decouple DNS from Node1
 
 Currently dnsmasq runs exclusively on node1, configured via cloud-init during cluster creation. All other nodes point their DNS at node1's cluster IP (`10.0.0.x`). This means, if node1 is rebooted or temporarily unavailable, all cluster DNS resolution breaks for other nodes
