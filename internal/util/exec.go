@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -66,13 +65,6 @@ func RunCommand(ctx context.Context, name string, args ...string) (*ExecResult, 
 
 	result.ExitCode = 0
 	return result, nil
-}
-
-func RunCommandWithTimeout(name string, timeout time.Duration, args ...string) (*ExecResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return RunCommand(ctx, name, args...)
 }
 
 func RunCommandOutput(ctx context.Context, name string, args ...string) (string, error) {

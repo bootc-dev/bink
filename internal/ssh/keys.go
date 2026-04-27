@@ -23,20 +23,6 @@ const (
 	DefaultSSHHost = "localhost"
 )
 
-// KeyConfig holds SSH key configuration
-type KeyConfig struct {
-	PrivateKeyPath string
-	PublicKeyPath  string
-}
-
-// GetDefaultKeyConfig returns the default SSH key configuration
-func GetDefaultKeyConfig() KeyConfig {
-	return KeyConfig{
-		PrivateKeyPath: DefaultKeyPath,
-		PublicKeyPath:  DefaultKeyPath + ".pub",
-	}
-}
-
 // EnsureHostKeys checks that SSH keys exist on the host
 func EnsureHostKeys(keyDir string) error {
 	privateKey := filepath.Join(keyDir, "cluster.key")

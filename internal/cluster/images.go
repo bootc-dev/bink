@@ -90,15 +90,6 @@ func (c *Cluster) createVolume(ctx context.Context, name string) error {
 	return c.podmanClient.VolumeCreate(ctx, name)
 }
 
-func (c *Cluster) isVolumePopulated(ctx context.Context, volumeName string) (bool, error) {
-	err := c.podmanClient.ContainerRunQuiet(ctx,
-		config.DefaultBaseImage,
-		[]string{"sh", "-c", "test -d /check/overlay-images && test -d /check/overlay-layers"},
-		[]string{fmt.Sprintf("%s:/check:z", volumeName)},
-	)
-	return err == nil, nil
-}
-
 func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) error {
 	logrus.Info("Pre-pulling Kubernetes and Calico images into volume...")
 
@@ -161,12 +152,6 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 
 	logrus.Info("✓ All images pulled successfully")
 	return nil
-}
-
-// GetImagesVolumeName returns the volume name for this cluster
-// The images volume is shared across all clusters
-func (c *Cluster) GetImagesVolumeName() string {
-	return ClusterImagesVolume
 }
 
 // isVolumeCompleted checks if volume has been successfully populated

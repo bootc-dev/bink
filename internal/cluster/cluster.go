@@ -52,16 +52,6 @@ func New(cfg Config) *Cluster {
 	}
 }
 
-// GetControlPlane returns the control plane node name
-func (c *Cluster) GetControlPlane() string {
-	return c.controlPlane
-}
-
-// GetName returns the cluster name
-func (c *Cluster) GetName() string {
-	return c.name
-}
-
 // WaitForCloudInit waits for cloud-init to complete on a node
 func (c *Cluster) WaitForCloudInit(ctx context.Context, nodeName string, timeout time.Duration) error {
 	c.logger.Infof("Waiting for cloud-init to complete on %s...", nodeName)
