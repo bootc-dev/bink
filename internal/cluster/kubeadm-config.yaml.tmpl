@@ -1,0 +1,28 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "{{.AdvertiseAddress}}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: "unix:///var/run/crio/crio.sock"
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: "{{.KubernetesVersion}}"
+controlPlaneEndpoint: "{{.AdvertiseAddress}}:6443"
+apiServer:
+  certSANs:
+  - "localhost"
+  - "127.0.0.1"
+controllerManager:
+  extraArgs:
+    flex-volume-plugin-dir: "/var/lib/kubelet/volumeplugins"
+  extraVolumes:
+  - name: flexvolume-dir
+    hostPath: "/var/lib/kubelet/volumeplugins"
+    mountPath: "/var/lib/kubelet/volumeplugins"
+    readOnly: false
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+volumePluginDir: "/var/lib/kubelet/volumeplugins"

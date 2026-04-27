@@ -1,44 +1,27 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"os/exec"
+	"text/template"
 	"time"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
-const kubeadmConfigTemplate = `apiVersion: kubeadm.k8s.io/v1beta3
-kind: InitConfiguration
-localAPIEndpoint:
-  advertiseAddress: "%s"
-  bindPort: 6443
-nodeRegistration:
-  criSocket: "unix:///var/run/crio/crio.sock"
----
-apiVersion: kubeadm.k8s.io/v1beta3
-kind: ClusterConfiguration
-kubernetesVersion: "%s"
-controlPlaneEndpoint: "%s:6443"
-apiServer:
-  certSANs:
-  - "localhost"
-  - "127.0.0.1"
-controllerManager:
-  extraArgs:
-    flex-volume-plugin-dir: "/var/lib/kubelet/volumeplugins"
-  extraVolumes:
-  - name: flexvolume-dir
-    hostPath: "/var/lib/kubelet/volumeplugins"
-    mountPath: "/var/lib/kubelet/volumeplugins"
-    readOnly: false
----
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-volumePluginDir: "/var/lib/kubelet/volumeplugins"
-`
+//go:embed kubeadm-config.yaml.tmpl
+var kubeadmConfigTmpl string
+
+var kubeadmConfigTemplate = template.Must(template.New("kubeadm-config").Parse(kubeadmConfigTmpl))
+
+type kubeadmConfigParams struct {
+	AdvertiseAddress  string
+	KubernetesVersion string
+}
 
 const calicoVersion = "v3.27.0"
 
@@ -147,8 +130,15 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 // createKubeadmConfig creates the kubeadm config file in the container
 func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string, advertiseAddress string) error {
-	kubeadmConfig := fmt.Sprintf(kubeadmConfigTemplate, advertiseAddress, config.KubernetesVersion, advertiseAddress)
-	cmd := fmt.Sprintf("podman exec %s bash -c 'cat > /tmp/kubeadm-config.yaml << \"KUBEADM\"\n%sKUBEADM\n'", containerName, kubeadmConfig)
+	var buf bytes.Buffer
+	if err := kubeadmConfigTemplate.Execute(&buf, kubeadmConfigParams{
+		AdvertiseAddress:  advertiseAddress,
+		KubernetesVersion: config.KubernetesVersion,
+	}); err != nil {
+		return fmt.Errorf("failed to render kubeadm config: %w", err)
+	}
+
+	cmd := fmt.Sprintf("podman exec %s bash -c 'cat > /tmp/kubeadm-config.yaml << \"KUBEADM\"\n%sKUBEADM\n'", containerName, buf.String())
 
 	execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
 	output, err := execCmd.CombinedOutput()
