@@ -1,14 +1,105 @@
 package node
 
 import (
+	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/template"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
+
+//go:embed templates/*.tmpl
+var templateFS embed.FS
+
+var cloudInitTemplates = template.Must(
+	template.ParseFS(templateFS, "templates/*.tmpl"),
+)
+
+type CloudInitData struct {
+	NodeName         string
+	ClusterIP        string
+	Node1IP          string
+	IsNode1          bool
+	SSHUser          string
+	SSHPubKey        string
+	ClusterDomain    string
+	UpstreamDNS1     string
+	UpstreamDNS2     string
+	RegistryStaticIP string
+	RegistryPort     int
+	RegistryHostname string
+}
+
+func (n *Node) newCloudInitData(sshPubKey string) CloudInitData {
+	return CloudInitData{
+		NodeName:         n.Name,
+		ClusterIP:        n.ClusterIP,
+		Node1IP:          CalculateClusterIP("node1"),
+		IsNode1:          n.Name == "node1",
+		SSHUser:          config.DefaultSSHUser,
+		SSHPubKey:        strings.TrimSpace(sshPubKey),
+		ClusterDomain:    config.ClusterDomain,
+		UpstreamDNS1:     config.UpstreamDNS1,
+		UpstreamDNS2:     config.UpstreamDNS2,
+		RegistryStaticIP: config.RegistryStaticIP,
+		RegistryPort:     config.RegistryPort,
+		RegistryHostname: config.RegistryHostname,
+	}
+}
+
+func renderTemplate(name string, data CloudInitData) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := cloudInitTemplates.ExecuteTemplate(&buf, name, data); err != nil {
+		return nil, fmt.Errorf("rendering template %s: %w", name, err)
+	}
+	return buf.Bytes(), nil
+}
+
+func validateYAML(content []byte, name string) error {
+	raw := content
+	if name == "user-data.yaml.tmpl" {
+		raw = bytes.TrimPrefix(raw, []byte("#cloud-config\n"))
+	}
+
+	var doc interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return fmt.Errorf("invalid YAML in %s: %w", name, err)
+	}
+
+	m, ok := doc.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid YAML in %s: expected a mapping at top level", name)
+	}
+
+	switch name {
+	case "user-data.yaml.tmpl":
+		for _, key := range []string{"hostname", "users", "write_files", "runcmd"} {
+			if _, exists := m[key]; !exists {
+				return fmt.Errorf("invalid cloud-config: missing required key %q", key)
+			}
+		}
+	case "network-config.yaml.tmpl":
+		if _, exists := m["version"]; !exists {
+			return fmt.Errorf("invalid network-config: missing required key %q", "version")
+		}
+		if _, exists := m["ethernets"]; !exists {
+			return fmt.Errorf("invalid network-config: missing required key %q", "ethernets")
+		}
+	case "meta-data.yaml.tmpl":
+		if _, exists := m["instance-id"]; !exists {
+			return fmt.Errorf("invalid meta-data: missing required key %q", "instance-id")
+		}
+	}
+
+	return nil
+}
 
 func (n *Node) generateCloudInit(ctx context.Context) error {
 	logrus.Infof("Creating cloud-init ISO for %s", n.Name)
@@ -19,219 +110,51 @@ func (n *Node) generateCloudInit(ctx context.Context) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Read public key from container volume
 	pubKey, err := n.podman.ContainerExec(ctx, n.ContainerName, []string{"cat", config.ClusterKeyPubPath})
 	if err != nil {
 		return fmt.Errorf("reading public key: %w", err)
 	}
 
-	if err := n.writeMetaData(tmpDir); err != nil {
-		return err
+	data := n.newCloudInitData(string(pubKey))
+
+	type templateFile struct {
+		tmpl     string
+		filename string
+	}
+	files := []templateFile{
+		{"meta-data.yaml.tmpl", "meta-data"},
+		{"network-config.yaml.tmpl", "network-config"},
+		{"user-data.yaml.tmpl", "user-data"},
 	}
 
-	if err := n.writeNetworkConfig(tmpDir); err != nil {
-		return err
-	}
-
-	if err := n.writeUserData(tmpDir, string(pubKey)); err != nil {
-		return err
+	for _, f := range files {
+		content, err := renderTemplate(f.tmpl, data)
+		if err != nil {
+			return err
+		}
+		if err := validateYAML(content, f.tmpl); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, f.filename), content, 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", f.filename, err)
+		}
 	}
 
 	isoPath := fmt.Sprintf("/workspace/%s-cloud-init.iso", n.Name)
-	files := []string{
-		"/tmp/meta-data",
-		"/tmp/user-data",
-		"/tmp/network-config",
+	containerFiles := []string{"/tmp/meta-data", "/tmp/user-data", "/tmp/network-config"}
+
+	for _, f := range files {
+		src := filepath.Join(tmpDir, f.filename)
+		dst := "/tmp/" + f.filename
+		if err := n.podman.ContainerCopy(ctx, src, n.ContainerName, dst); err != nil {
+			return fmt.Errorf("copying %s: %w", f.filename, err)
+		}
 	}
 
-	if err := n.podman.ContainerCopy(ctx, filepath.Join(tmpDir, "meta-data"), n.ContainerName, "/tmp/meta-data"); err != nil {
-		return fmt.Errorf("copying meta-data: %w", err)
-	}
-	if err := n.podman.ContainerCopy(ctx, filepath.Join(tmpDir, "user-data"), n.ContainerName, "/tmp/user-data"); err != nil {
-		return fmt.Errorf("copying user-data: %w", err)
-	}
-	if err := n.podman.ContainerCopy(ctx, filepath.Join(tmpDir, "network-config"), n.ContainerName, "/tmp/network-config"); err != nil {
-		return fmt.Errorf("copying network-config: %w", err)
-	}
-
-	if err := n.virsh.Genisoimage(ctx, isoPath, config.CloudInitVolID, files); err != nil {
+	if err := n.virsh.Genisoimage(ctx, isoPath, config.CloudInitVolID, containerFiles); err != nil {
 		return fmt.Errorf("creating ISO: %w", err)
 	}
 
 	logrus.Infof("Cloud-init ISO created at %s", isoPath)
 	return nil
-}
-
-func (n *Node) writeMetaData(dir string) error {
-	content := fmt.Sprintf(`instance-id: %s
-local-hostname: %s
-`, n.Name, n.Name)
-
-	return os.WriteFile(filepath.Join(dir, "meta-data"), []byte(content), 0644)
-}
-
-func (n *Node) writeNetworkConfig(dir string) error {
-	node1IP := CalculateClusterIP("node1")
-
-	content := fmt.Sprintf(`version: 2
-ethernets:
-  enp2s0:
-    dhcp4: true
-  enp3s0:
-    dhcp4: false
-    dhcp6: false
-    addresses:
-      - %s/24
-    nameservers:
-      search: [%s]
-      addresses: [%s, %s]
-    optional: true
-`, n.ClusterIP, config.ClusterDomain, node1IP, config.UpstreamDNS1)
-
-	return os.WriteFile(filepath.Join(dir, "network-config"), []byte(content), 0644)
-}
-
-func (n *Node) writeUserData(dir, sshPubKey string) error {
-	dnsmasqConfig := ""
-	dnsmasqRuncmd := ""
-
-	if n.Name == "node1" {
-		dnsmasqConfig = fmt.Sprintf(`  - path: /etc/dnsmasq.d/cluster.conf
-    content: |
-      listen-address=%s
-      bind-interfaces
-      no-hosts
-      addn-hosts=/var/lib/dnsmasq/cluster-hosts
-      domain=%s
-      domain-needed
-      bogus-priv
-      server=%s
-      server=%s
-      cache-size=1000
-  - path: /var/lib/dnsmasq/cluster-hosts
-    owner: dnsmasq:dnsmasq
-    permissions: '0644'
-    content: |
-      %s %s %s.%s
-      %s %s %s.%s
-  - path: /etc/systemd/system/dnsmasq.service.d/wait-for-network.conf
-    content: |
-      [Unit]
-      After=network-online.target
-      Wants=network-online.target
-`, n.ClusterIP, config.ClusterDomain, config.UpstreamDNS1, config.UpstreamDNS2,
-			n.ClusterIP, n.Name, n.Name, config.ClusterDomain,
-			config.RegistryStaticIP, config.RegistryHostname, config.RegistryHostname, config.ClusterDomain)
-
-		dnsmasqRuncmd = `  - chown dnsmasq:dnsmasq /var/lib/dnsmasq/cluster-hosts
-  - restorecon -v /var/lib/dnsmasq/cluster-hosts || true
-  - systemctl daemon-reload
-  - |
-    # Wait for enp3s0 to be up before starting dnsmasq
-    for i in {1..30}; do
-      if ip link show enp3s0 | grep -q "state UP"; then
-        echo "enp3s0 is up"
-        break
-      fi
-      echo "Waiting for enp3s0... ($i/30)"
-      sleep 1
-    done
-  - systemctl enable --now dnsmasq`
-	}
-
-	content := fmt.Sprintf(`#cloud-config
-hostname: %s
-users:
-  - name: %s
-    ssh_authorized_keys:
-      - %s
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: wheel
-    shell: /bin/bash
-
-write_files:
-  - path: /etc/kubernetes/kubelet-config.yaml
-    content: |
-      apiVersion: kubelet.config.k8s.io/v1beta1
-      kind: KubeletConfiguration
-      volumePluginDir: /var/lib/kubelet/volumeplugins
-  - path: /etc/sysconfig/kubelet
-    content: |
-      KUBELET_EXTRA_ARGS=--volume-plugin-dir=/var/lib/kubelet/volumeplugins
-  - path: /etc/containers/storage.conf
-    content: |
-      [storage]
-      driver = "overlay"
-      runroot = "/run/containers/storage"
-      graphroot = "/var/lib/containers/storage"
-
-      [storage.options]
-      additionalimagestores = [
-        "/var/mnt/cluster_images",
-      ]
-  - path: /etc/crio/crio.conf.d/01-cni-plugins.conf
-    content: |
-      [crio.network]
-      plugin_dirs = [
-        "/opt/cni/bin",
-        "/var/lib/cni/bin",
-        "/usr/libexec/cni",
-      ]
-  - path: /etc/crio/crio.conf.d/02-capabilities.conf
-    content: |
-      [crio.runtime]
-      add_inheritable_capabilities = true
-  - path: /etc/crio/crio.conf.d/03-local-registry.conf
-    content: |
-      [crio.image]
-      insecure_registries = ["%s:%d", "%s.%s:%d"]
-  - path: /etc/containers/registries.conf.d/10-local-registry.conf
-    content: |
-      [[registry]]
-      location = "%s:%d"
-      insecure = true
-
-      [[registry]]
-      location = "%s.%s:%d"
-      insecure = true
-  - path: /etc/systemd/system/var-mnt-cluster_images.mount
-    content: |
-      [Unit]
-      Description=Mount cluster images via virtiofs
-      Before=crio.service
-
-      [Mount]
-      What=cluster_images
-      Where=/var/mnt/cluster_images
-      Type=virtiofs
-
-      [Install]
-      WantedBy=multi-user.target
-%s
-runcmd:
-  - swapoff -a
-  - sed -i '/swap/d' /etc/fstab
-  - modprobe br_netfilter
-  - echo 'br_netfilter' > /etc/modules-load.d/k8s-bridge.conf
-  - sysctl -w net.ipv4.ip_forward=1
-  - echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-kubernetes.conf
-  - mkdir -p /var/lib/kubelet/volumeplugins
-  - mkdir -p /var/mnt/cluster_images
-  - mkdir -p /var/lib/containers/storage
-  - systemctl daemon-reload
-  - systemctl enable --now var-mnt-cluster_images.mount
-  - systemctl enable --now ostree-state-overlay@opt.service
-  - systemctl enable --now qemu-guest-agent
-  - nmcli connection modify "cloud-init enp3s0" ipv4.dns-search "~%s %s"
-  - nmcli connection up "cloud-init enp3s0"
-%s
-  - systemctl enable --now crio
-  - systemctl enable kubelet
-`, n.Name, config.DefaultSSHUser, sshPubKey,
-		config.RegistryStaticIP, config.RegistryPort, config.RegistryHostname, config.ClusterDomain, config.RegistryPort,
-		config.RegistryStaticIP, config.RegistryPort, config.RegistryHostname, config.ClusterDomain, config.RegistryPort,
-		dnsmasqConfig,
-		config.ClusterDomain, config.ClusterDomain, dnsmasqRuncmd)
-
-	return os.WriteFile(filepath.Join(dir, "user-data"), []byte(content), 0644)
 }

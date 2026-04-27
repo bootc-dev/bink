@@ -1,0 +1,13 @@
+version: 2
+ethernets:
+  enp2s0:
+    dhcp4: true
+  enp3s0:
+    dhcp4: false
+    dhcp6: false
+    addresses:
+      - {{.ClusterIP}}/24
+    nameservers:
+      search: [{{.ClusterDomain}}]
+      addresses: [{{.Node1IP}}, {{.UpstreamDNS1}}]
+    optional: true

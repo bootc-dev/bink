@@ -1,0 +1,128 @@
+#cloud-config
+hostname: {{.NodeName}}
+users:
+  - name: {{.SSHUser}}
+    ssh_authorized_keys:
+      - {{.SSHPubKey}}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: wheel
+    shell: /bin/bash
+
+write_files:
+  - path: /etc/kubernetes/kubelet-config.yaml
+    content: |
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      volumePluginDir: /var/lib/kubelet/volumeplugins
+  - path: /etc/sysconfig/kubelet
+    content: |
+      KUBELET_EXTRA_ARGS=--volume-plugin-dir=/var/lib/kubelet/volumeplugins
+  - path: /etc/containers/storage.conf
+    content: |
+      [storage]
+      driver = "overlay"
+      runroot = "/run/containers/storage"
+      graphroot = "/var/lib/containers/storage"
+
+      [storage.options]
+      additionalimagestores = [
+        "/var/mnt/cluster_images",
+      ]
+  - path: /etc/crio/crio.conf.d/01-cni-plugins.conf
+    content: |
+      [crio.network]
+      plugin_dirs = [
+        "/opt/cni/bin",
+        "/var/lib/cni/bin",
+        "/usr/libexec/cni",
+      ]
+  - path: /etc/crio/crio.conf.d/02-capabilities.conf
+    content: |
+      [crio.runtime]
+      add_inheritable_capabilities = true
+  - path: /etc/crio/crio.conf.d/03-local-registry.conf
+    content: |
+      [crio.image]
+      insecure_registries = ["{{.RegistryStaticIP}}:{{.RegistryPort}}", "{{.RegistryHostname}}.{{.ClusterDomain}}:{{.RegistryPort}}"]
+  - path: /etc/containers/registries.conf.d/10-local-registry.conf
+    content: |
+      [[registry]]
+      location = "{{.RegistryStaticIP}}:{{.RegistryPort}}"
+      insecure = true
+
+      [[registry]]
+      location = "{{.RegistryHostname}}.{{.ClusterDomain}}:{{.RegistryPort}}"
+      insecure = true
+  - path: /etc/systemd/system/var-mnt-cluster_images.mount
+    content: |
+      [Unit]
+      Description=Mount cluster images via virtiofs
+      Before=crio.service
+
+      [Mount]
+      What=cluster_images
+      Where=/var/mnt/cluster_images
+      Type=virtiofs
+
+      [Install]
+      WantedBy=multi-user.target
+{{- if .IsNode1}}
+  - path: /etc/dnsmasq.d/cluster.conf
+    content: |
+      listen-address={{.ClusterIP}}
+      bind-interfaces
+      no-hosts
+      addn-hosts=/var/lib/dnsmasq/cluster-hosts
+      domain={{.ClusterDomain}}
+      domain-needed
+      bogus-priv
+      server={{.UpstreamDNS1}}
+      server={{.UpstreamDNS2}}
+      cache-size=1000
+  - path: /var/lib/dnsmasq/cluster-hosts
+    owner: dnsmasq:dnsmasq
+    permissions: '0644'
+    content: |
+      {{.ClusterIP}} {{.NodeName}} {{.NodeName}}.{{.ClusterDomain}}
+      {{.RegistryStaticIP}} {{.RegistryHostname}} {{.RegistryHostname}}.{{.ClusterDomain}}
+  - path: /etc/systemd/system/dnsmasq.service.d/wait-for-network.conf
+    content: |
+      [Unit]
+      After=network-online.target
+      Wants=network-online.target
+{{- end}}
+
+runcmd:
+  - swapoff -a
+  - sed -i '/swap/d' /etc/fstab
+  - modprobe br_netfilter
+  - echo 'br_netfilter' > /etc/modules-load.d/k8s-bridge.conf
+  - sysctl -w net.ipv4.ip_forward=1
+  - echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-kubernetes.conf
+  - mkdir -p /var/lib/kubelet/volumeplugins
+  - mkdir -p /var/mnt/cluster_images
+  - mkdir -p /var/lib/containers/storage
+  - systemctl daemon-reload
+  - systemctl enable --now var-mnt-cluster_images.mount
+  - systemctl enable --now ostree-state-overlay@opt.service
+  - systemctl enable --now qemu-guest-agent
+  - nmcli connection modify "cloud-init enp3s0" ipv4.dns-search "~{{.ClusterDomain}} {{.ClusterDomain}}"
+  - nmcli connection up "cloud-init enp3s0"
+{{- if .IsNode1}}
+  - chown dnsmasq:dnsmasq /var/lib/dnsmasq/cluster-hosts
+  - restorecon -v /var/lib/dnsmasq/cluster-hosts || true
+  - systemctl daemon-reload
+  - |
+    # Wait for enp3s0 to be up before starting dnsmasq
+    for i in {1..30}; do
+      if ip link show enp3s0 | grep -q "state UP"; then
+        echo "enp3s0 is up"
+        break
+      fi
+      echo "Waiting for enp3s0... ($i/30)"
+      sleep 1
+    done
+  - systemctl enable --now dnsmasq
+{{- end}}
+  - systemctl enable --now crio
+  - systemctl enable kubelet
