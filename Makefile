@@ -7,6 +7,7 @@ IMAGES_CONTAINER := localhost/fedora-bootc-k8s-image:latest
 POPULATOR_IMAGE := localhost/cluster-images-populator:latest
 DISK_IMAGE := fedora-bootc-k8s.qcow2
 DISK_SIZE := 10G
+KUBE_MINOR := 1.35
 
 # Binary
 BINK_BINARY := bink
@@ -38,7 +39,7 @@ build-bink-container:
 # Build the fedora-bootc-k8s VM image
 build-vm-image:
 	@echo "=== Building fedora-bootc-k8s VM image ==="
-	podman build -t $(BOOTC_IMAGE) -f $(IMAGES_DIR)/Containerfile $(IMAGES_DIR)
+	podman build --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(BOOTC_IMAGE) -f $(IMAGES_DIR)/Containerfile $(IMAGES_DIR)
 	@echo "✅ VM image built: $(BOOTC_IMAGE)"
 
 # Build the cluster container image
@@ -75,7 +76,7 @@ build-images-container: build-disk
 # Build the populator image (skopeo pre-installed for fast volume population)
 build-populator-image:
 	@echo "=== Building cluster images populator ==="
-	podman build -t $(POPULATOR_IMAGE) -f $(POPULATOR_DIR)/Containerfile $(POPULATOR_DIR)
+	podman build --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(POPULATOR_IMAGE) -f $(POPULATOR_DIR)/Containerfile $(POPULATOR_DIR)
 	@echo "✅ Populator image built: $(POPULATOR_IMAGE)"
 
 # Clean built images and disk

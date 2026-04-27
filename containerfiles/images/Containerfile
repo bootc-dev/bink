@@ -1,9 +1,10 @@
 FROM quay.io/fedora/fedora-bootc as root
 
+ARG KUBE_MINOR=1.35
 RUN dnf install -y \
     kubernetes \
-    kubernetes1.35-kubeadm \
-    cri-o1.35 \
+    kubernetes${KUBE_MINOR}-kubeadm \
+    cri-o${KUBE_MINOR} \
     openssh-server \
     qemu-guest-agent \
     bind-utils \

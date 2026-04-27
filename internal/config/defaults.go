@@ -32,7 +32,10 @@ const (
 	ClusterMACPrefix   = "52:54:01"
 
 	DefaultAPIServerPort = 6443
-	DefaultCNIManifest   = "https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml"
+
+	KubernetesVersion = "v1.35.0"
+
+	DefaultCNIManifest = "https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml"
 	DefaultKubeconfigDir = "."
 
 	ContainerNamePrefix = "k8s-"

@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -101,23 +102,6 @@ func (c *Cluster) isVolumePopulated(ctx context.Context, volumeName string) (boo
 func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) error {
 	logrus.Info("Pre-pulling Kubernetes and Calico images into volume...")
 
-	images := []string{
-		"registry.k8s.io/kube-apiserver:v1.35.0",
-		"registry.k8s.io/kube-controller-manager:v1.35.0",
-		"registry.k8s.io/kube-scheduler:v1.35.0",
-		"registry.k8s.io/kube-proxy:v1.35.0",
-		"registry.k8s.io/coredns/coredns:v1.11.1",
-		"registry.k8s.io/pause:3.10",
-		"registry.k8s.io/etcd:3.5.16-0",
-		"quay.io/calico/cni:" + calicoVersion,
-		"quay.io/calico/node:" + calicoVersion,
-		"quay.io/calico/kube-controllers:" + calicoVersion,
-	}
-
-	logrus.Infof("Found %d images to pull", len(images))
-
-	// Use a global container name for population (shared across all clusters)
-	// This allows other processes to wait for it using `podman wait`
 	tmpContainer := PopulatorContainerName
 
 	logrus.Infof("Creating populator container: %s", tmpContainer)
@@ -139,11 +123,33 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 		c.podmanClient.ContainerRemove(ctx, tmpContainer, true)
 	}()
 
+	// Query kubeadm for the exact images it needs
+	logrus.Info("Querying kubeadm for required images...")
+	output, err := c.podmanClient.ContainerExec(ctx, tmpContainer,
+		[]string{"kubeadm", "config", "images", "list", "--kubernetes-version", config.KubernetesVersion})
+	if err != nil {
+		return fmt.Errorf("querying kubeadm for images: %w", err)
+	}
+
+	var images []string
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			images = append(images, line)
+		}
+	}
+
+	// Add Calico CNI images
+	images = append(images,
+		"quay.io/calico/cni:"+calicoVersion,
+		"quay.io/calico/node:"+calicoVersion,
+		"quay.io/calico/kube-controllers:"+calicoVersion,
+	)
+
+	logrus.Infof("Found %d images to pull", len(images))
+
 	// Pull each image using skopeo
 	for i, image := range images {
-		if image == "" {
-			continue
-		}
 		logrus.Infof("[%d/%d] Pulling %s", i+1, len(images), image)
 
 		if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
