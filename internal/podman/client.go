@@ -30,12 +30,6 @@ type Client struct {
 
 type ClientOption func(*Client)
 
-func WithSocketPath(path string) ClientOption {
-	return func(c *Client) {
-		c.socketPath = path
-	}
-}
-
 func NewClient(opts ...ClientOption) (*Client, error) {
 	// Check for CONTAINER_HOST environment variable first (like podman CLI does)
 	defaultSocketPath := os.Getenv("CONTAINER_HOST")
@@ -682,62 +676,6 @@ func (c *Client) ContainerRunQuiet(ctx context.Context, image string, cmd []stri
 	}
 
 	return nil
-}
-
-func (c *Client) ContainerRunOutput(ctx context.Context, image string, cmd []string, volumeMounts []string) (string, error) {
-	if err := c.ensureConnection(); err != nil {
-		return "", err
-	}
-
-	spec := specgen.NewSpecGenerator(image, false)
-	spec.Command = cmd
-	remove := true
-	spec.Remove = &remove
-
-	for _, mount := range volumeMounts {
-		parts := strings.SplitN(mount, ":", 3)
-		if len(parts) >= 2 {
-			spec.Volumes = append(spec.Volumes, &specgen.NamedVolume{
-				Name: parts[0],
-				Dest: parts[1],
-			})
-		}
-	}
-
-	createResponse, err := containers.CreateWithSpec(c.conn, spec, nil)
-	if err != nil {
-		return "", fmt.Errorf("creating container: %w", err)
-	}
-
-	if err := containers.Start(c.conn, createResponse.ID, nil); err != nil {
-		return "", fmt.Errorf("starting container: %w", err)
-	}
-
-	exitCode, err := containers.Wait(c.conn, createResponse.ID, nil)
-	if err != nil {
-		return "", fmt.Errorf("waiting for container: %w", err)
-	}
-
-	stdoutChan := make(chan string, 1)
-	stderrChan := make(chan string, 1)
-	opts := new(containers.LogOptions)
-	stdout := true
-	opts.Stdout = &stdout
-
-	go func() {
-		containers.Logs(c.conn, createResponse.ID, opts, stdoutChan, stderrChan)
-	}()
-
-	var output strings.Builder
-	for msg := range stdoutChan {
-		output.WriteString(msg)
-	}
-
-	if exitCode != 0 {
-		return "", fmt.Errorf("container exited with code %d", exitCode)
-	}
-
-	return output.String(), nil
 }
 
 func (c *Client) GetPublishedPort(ctx context.Context, containerName, containerPort string) (int, error) {

@@ -123,35 +123,3 @@ func (c *Client) Genisoimage(ctx context.Context, outputPath, volumeID string, f
 	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
 }
 
-func (c *Client) DomainList(ctx context.Context) ([]string, error) {
-	output, err := c.ExecInContainer(ctx, "virsh", "-c", "qemu:///session", "list", "--name", "--all")
-	if err != nil {
-		return nil, err
-	}
-
-	if output == "" {
-		return []string{}, nil
-	}
-
-	domains := []string{}
-	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			domains = append(domains, line)
-		}
-	}
-
-	return domains, nil
-}
-
-func (c *Client) DomainDestroy(ctx context.Context, name string) error {
-	logrus.Debugf("Destroying domain %s", name)
-	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName,
-		[]string{"virsh", "-c", "qemu:///session", "destroy", name})
-}
-
-func (c *Client) DomainUndefine(ctx context.Context, name string) error {
-	logrus.Debugf("Undefining domain %s", name)
-	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName,
-		[]string{"virsh", "-c", "qemu:///session", "undefine", name})
-}

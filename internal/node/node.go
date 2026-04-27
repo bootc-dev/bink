@@ -59,23 +59,6 @@ func WithMemory(memory int) NodeOption {
 	}
 }
 
-func WithPodmanClient(client *podman.Client) NodeOption {
-	return func(n *Node) error {
-		n.podman = client
-		return nil
-	}
-}
-
-// skipPodmanInit is used internally to skip podman client creation
-var skipPodmanInit bool
-
-func WithoutPodmanClient() NodeOption {
-	return func(n *Node) error {
-		skipPodmanInit = true
-		return nil
-	}
-}
-
 func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 	n := &Node{
 		Name:           name,
@@ -86,17 +69,13 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 		BaseDisk:       config.DefaultBaseDisk,
 	}
 
-	skipInit := false
 	for _, opt := range opts {
 		if err := opt(n); err != nil {
 			return nil, err
 		}
 	}
-	skipInit = skipPodmanInit
-	skipPodmanInit = false
 
-	// Create podman client if not provided via options and not skipped
-	if n.podman == nil && !skipInit {
+	if n.podman == nil {
 		podmanClient, err := podman.NewClient()
 		if err != nil {
 			return nil, fmt.Errorf("creating podman client: %w", err)
