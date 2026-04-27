@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"os"
 	"os/exec"
 	"text/template"
 	"time"
@@ -15,6 +16,9 @@ import (
 
 //go:embed kubeadm-config.yaml.tmpl
 var kubeadmConfigTmpl string
+
+//go:embed calico.yaml
+var calicoManifest []byte
 
 var kubeadmConfigTemplate = template.Must(template.New("kubeadm-config").Parse(kubeadmConfigTmpl))
 
@@ -98,10 +102,9 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	c.logger.Info("")
 
-	// Install Calico CNI (use quay.io images instead of docker.io to match pre-pulled images)
+	// Install Calico CNI
 	c.logger.Info("=== Installing Calico CNI plugin ===")
-	calicoApplyCmd := fmt.Sprintf("curl -sL %s | sed 's|docker.io/calico/|quay.io/calico/|g' | kubectl apply -f -", config.DefaultCNIManifest)
-	if _, err := sshClient.Exec(ctx, calicoApplyCmd); err != nil {
+	if err := c.installCalicoCNI(ctx, containerName, sshClient); err != nil {
 		return fmt.Errorf("failed to install Calico: %w", err)
 	}
 
@@ -121,6 +124,35 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	c.logger.Info("")
 	c.logger.Info("✅ Cluster DNS server already configured via cloud-init")
 	c.logger.Infof("   Node %s will serve DNS on %s:53", nodeName, clusterIP)
+
+	return nil
+}
+
+// installCalicoCNI copies the embedded Calico manifest to the VM and applies it
+func (c *Cluster) installCalicoCNI(ctx context.Context, containerName string, sshClient *ssh.Client) error {
+	tmpFile, err := os.CreateTemp("", "calico-*.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(calicoManifest); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write manifest: %w", err)
+	}
+	tmpFile.Close()
+
+	if err := c.podmanClient.ContainerCopy(ctx, tmpFile.Name(), containerName, "/tmp/calico.yaml"); err != nil {
+		return fmt.Errorf("failed to copy manifest to container: %w", err)
+	}
+
+	if err := sshClient.CopyTo(ctx, "/tmp/calico.yaml", "/tmp/calico.yaml"); err != nil {
+		return fmt.Errorf("failed to copy manifest to VM: %w", err)
+	}
+
+	if _, err := sshClient.Exec(ctx, "kubectl apply -f /tmp/calico.yaml"); err != nil {
+		return fmt.Errorf("failed to apply manifest: %w", err)
+	}
 
 	return nil
 }

@@ -1,4 +1,4 @@
-.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick test-unit test-all
+.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick test-unit test-all update-calico
 
 # Image names and tags
 BOOTC_IMAGE := localhost/fedora-bootc-k8s:latest
@@ -95,6 +95,18 @@ clean-disk:
 # Rebuild everything from scratch
 rebuild: clean all
 
+# Update embedded Calico CNI manifest (version read from internal/config/defaults.go)
+CALICO_VERSION := $(shell grep 'CalicoVersion' internal/config/defaults.go | head -1 | sed 's/.*"\(.*\)"/\1/')
+CALICO_MANIFEST := internal/cluster/calico.yaml
+
+update-calico:
+	@echo "=== Fetching Calico $(CALICO_VERSION) manifest ==="
+	curl -sL "https://raw.githubusercontent.com/projectcalico/calico/$(CALICO_VERSION)/manifests/calico.yaml" \
+		| sed 's|docker.io/calico/|quay.io/calico/|g' \
+		| sed '/name: calico-kube-controllers$$/{n;s|image:|securityContext:\n            runAsUser: 0\n            runAsGroup: 0\n          image:|;}' \
+		> $(CALICO_MANIFEST)
+	@echo "✅ Updated $(CALICO_MANIFEST)"
+
 # Test targets
 GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
 
@@ -132,6 +144,9 @@ help:
 	@echo "  clean                    - Remove all built images and disk"
 	@echo "  clean-disk               - Remove only the disk image"
 	@echo "  rebuild                  - Clean and rebuild everything"
+	@echo ""
+	@echo "Maintenance Targets:"
+	@echo "  update-calico            - Fetch/update embedded Calico CNI manifest"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test-integration         - Run all integration tests"
