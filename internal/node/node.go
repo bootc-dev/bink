@@ -7,7 +7,6 @@ import (
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/virsh"
-	"github.com/bootc-dev/bink/internal/virtiofsd"
 )
 
 type Node struct {
@@ -26,7 +25,6 @@ type Node struct {
 
 	podman       *podman.Client
 	virsh        *virsh.Client
-	virtiofsdMgr *virtiofsd.Manager
 }
 
 type NodeOption func(*Node) error
@@ -116,11 +114,6 @@ func (n *Node) Create(ctx context.Context) error {
 
 	if err := n.setupSSHKeys(ctx); err != nil {
 		return fmt.Errorf("setting up SSH keys: %w", err)
-	}
-
-	// Setup virtiofsd to share container images
-	if err := n.setupVirtiofsd(ctx); err != nil {
-		return fmt.Errorf("setting up virtiofsd: %w", err)
 	}
 
 	if err := n.createOverlayDisk(ctx); err != nil {

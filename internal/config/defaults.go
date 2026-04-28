@@ -21,6 +21,9 @@ const (
 	ClusterKeyPubPath   = "/var/run/cluster/cluster.key.pub"
 	ClusterKeysHostPath = "./vm"
 
+	VirtiofsSocketPath = "/var/lib/libvirt/virtiofsd/virtiofsd.sock"
+	VirtiofsSharedDir  = "/var/lib/cluster-images"
+
 	MulticastAddr = "230.0.0.1"
 	MulticastPort = 5558
 
