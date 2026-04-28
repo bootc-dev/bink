@@ -1,5 +1,6 @@
 # Build environment for bink CLI with all C dependencies
-FROM registry.fedoraproject.org/fedora:43
+ARG FEDORA_VERSION=43
+FROM registry.fedoraproject.org/fedora:${FEDORA_VERSION}
 
 # Install Go and required C libraries for Podman bindings
 RUN dnf install -y \

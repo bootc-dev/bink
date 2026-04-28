@@ -132,9 +132,9 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 
 	// Add Calico CNI images
 	images = append(images,
-		"quay.io/calico/cni:"+config.CalicoVersion,
-		"quay.io/calico/node:"+config.CalicoVersion,
-		"quay.io/calico/kube-controllers:"+config.CalicoVersion,
+		config.CalicoImageBase+"/cni:"+config.CalicoVersion,
+		config.CalicoImageBase+"/node:"+config.CalicoVersion,
+		config.CalicoImageBase+"/kube-controllers:"+config.CalicoVersion,
 	)
 
 	logrus.Infof("Found %d images to pull", len(images))
@@ -157,7 +157,7 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 // isVolumeCompleted checks if volume has been successfully populated
 func (c *Cluster) isVolumeCompleted(ctx context.Context, volumeName string) bool {
 	err := c.podmanClient.ContainerRunQuiet(ctx,
-		config.DefaultBaseImage,
+		config.DefaultPopulatorImage,
 		[]string{"test", "-f", "/check/.completed"},
 		[]string{fmt.Sprintf("%s:/check:z", volumeName)},
 	)
@@ -195,7 +195,7 @@ func (c *Cluster) waitForPopulationComplete(ctx context.Context) error {
 // markVolumeCompleted creates a marker file indicating successful population
 func (c *Cluster) markVolumeCompleted(ctx context.Context, volumeName string) error {
 	return c.podmanClient.ContainerRunQuiet(ctx,
-		config.DefaultBaseImage,
+		config.DefaultPopulatorImage,
 		[]string{"touch", "/mark/.completed"},
 		[]string{fmt.Sprintf("%s:/mark:z", volumeName)},
 	)

@@ -1,4 +1,5 @@
-FROM quay.io/fedora/fedora:43
+ARG FEDORA_VERSION=43
+FROM quay.io/fedora/fedora:${FEDORA_VERSION}
 
 ARG KUBE_MINOR=1.35
 RUN dnf install -y -q skopeo kubernetes${KUBE_MINOR}-kubeadm && dnf clean all

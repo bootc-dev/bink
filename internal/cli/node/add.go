@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/bootc-dev/bink/internal/cluster"
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/dns"
 	"github.com/bootc-dev/bink/internal/node"
 )
@@ -31,7 +32,7 @@ func newAddCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&controlPlane, "control-plane", "c", "node1", "Control plane node name")
-	cmd.Flags().StringVar(&imagesImage, "images-image", "localhost/fedora-bootc-k8s-image:latest", "Container image containing base VM images")
+	cmd.Flags().StringVar(&imagesImage, "images-image", config.DefaultBootcImagesImage, "Container image containing base VM images")
 	cmd.Flags().StringVarP(&role, "role", "r", "worker", "Node role: worker or control-plane")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 8192 MB)")
 

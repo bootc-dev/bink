@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
 
@@ -19,8 +20,8 @@ var _ = SynchronizedBeforeSuite(func() {
 
 	helpers.RequireCommand("podman")
 	helpers.RequireBink()
-	helpers.RequireImage("localhost/cluster:latest")
-	helpers.RequireImage("localhost/fedora-bootc-k8s-image:latest")
+	helpers.RequireImage(config.DefaultClusterImage)
+	helpers.RequireImage(config.DefaultBootcImagesImage)
 
 	GinkgoWriter.Println("✓ All prerequisites verified")
 }, func() {})

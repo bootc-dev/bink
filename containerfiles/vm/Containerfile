@@ -1,5 +1,5 @@
-# Base image version - must match config.DefaultBaseImage in internal/config/defaults.go
-FROM quay.io/fedora/fedora:43
+ARG FEDORA_VERSION=43
+FROM quay.io/fedora/fedora:${FEDORA_VERSION}
 
 RUN dnf install -y \
 	libvirt-client \

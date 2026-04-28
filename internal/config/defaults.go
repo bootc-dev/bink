@@ -4,10 +4,11 @@ const (
 	DefaultNetworkName = "podman"
 	DefaultSubnet      = "10.88.0.0/16"
 
+	FedoraVersion = "43"
+
 	DefaultClusterImage     = "localhost/cluster:latest"
 	DefaultBootcImage       = "localhost/fedora-bootc-k8s:latest"
 	DefaultBootcImagesImage = "localhost/fedora-bootc-k8s-image:latest"
-	DefaultBaseImage        = "quay.io/fedora/fedora:43"
 	DefaultPopulatorImage   = "localhost/cluster-images-populator:latest"
 
 	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"
@@ -36,9 +37,11 @@ const (
 
 	DefaultAPIServerPort = 6443
 
-	KubernetesVersion = "v1.35.0"
+	KubernetesVersion      = "v1.35.0"
+	KubernetesMinorVersion = "1.35"
 
-	CalicoVersion      = "v3.27.0"
+	CalicoVersion    = "v3.27.0"
+	CalicoImageBase  = "quay.io/calico"
 	DefaultCNIManifest = "https://raw.githubusercontent.com/projectcalico/calico/" + CalicoVersion + "/manifests/calico.yaml"
 	DefaultKubeconfigDir = "."
 
@@ -57,6 +60,8 @@ const (
 	RegistryStaticIP      = "10.88.0.2"
 	RegistryHostname      = "registry"
 	RegistryVolume        = "bink-registry-data"
+
+	TestBusyboxImage = "quay.io/libpod/busybox:latest"
 
 	CloudInitVolID = "cidata"
 

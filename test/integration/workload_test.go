@@ -1,11 +1,13 @@
 package integration_test
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
 
@@ -39,7 +41,7 @@ var _ = Describe("Kubernetes Workloads", func() {
 		helpers.WaitForNodeReady(kubeClient, "node3", 3*time.Minute)
 
 		By("Deploying a DaemonSet across all nodes")
-		helpers.ApplyDaemonSet(kubeClient, "default", `
+		helpers.ApplyDaemonSet(kubeClient, "default", fmt.Sprintf(`
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -55,9 +57,9 @@ spec:
     spec:
       containers:
       - name: busybox
-        image: quay.io/libpod/busybox:latest
+        image: %s
         command: ["sleep", "3600"]
-`)
+`, config.TestBusyboxImage))
 
 		By("Waiting for DaemonSet to schedule on all nodes")
 		helpers.WaitForDaemonSetReady(kubeClient, "default", "spread-test", 3, 10*time.Minute)

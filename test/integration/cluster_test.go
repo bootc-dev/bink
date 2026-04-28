@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/node"
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
@@ -90,7 +91,7 @@ var _ = Describe("Cluster Lifecycle", func() {
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{{
 						Name:    "busybox",
-						Image:   "quay.io/libpod/busybox:latest",
+						Image:   config.TestBusyboxImage,
 						Command: []string{"sleep", "3600"},
 					}},
 				},

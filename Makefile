@@ -1,13 +1,17 @@
 .PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick update-calico
 
-# Image names and tags
-BOOTC_IMAGE := localhost/fedora-bootc-k8s:latest
-CLUSTER_IMAGE := localhost/cluster:latest
-IMAGES_CONTAINER := localhost/fedora-bootc-k8s-image:latest
-POPULATOR_IMAGE := localhost/cluster-images-populator:latest
+# Extract image names and versions from internal/config/defaults.go (single source of truth)
+DEFAULTS_GO := internal/config/defaults.go
+extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
+
+BOOTC_IMAGE := $(call extract,DefaultBootcImage )
+CLUSTER_IMAGE := $(call extract,DefaultClusterImage )
+IMAGES_CONTAINER := $(call extract,DefaultBootcImagesImage )
+POPULATOR_IMAGE := $(call extract,DefaultPopulatorImage )
+FEDORA_VERSION := $(call extract,FedoraVersion )
+KUBE_MINOR := $(call extract,KubernetesMinorVersion )
 DISK_IMAGE := fedora-bootc-k8s.qcow2
 DISK_SIZE := 10G
-KUBE_MINOR := 1.35
 
 # Binary
 BINK_BINARY := bink
@@ -29,7 +33,7 @@ build-bink:
 # Build the bink CLI binary using containerized build (with all C dependencies)
 build-bink-container:
 	@echo "=== Building bink CLI binary in container ==="
-	podman build -t localhost/bink-builder:latest -f Containerfile .
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t localhost/bink-builder:latest -f Containerfile .
 	@echo "Extracting binary from container..."
 	@podman create --name bink-temp localhost/bink-builder:latest
 	@podman cp bink-temp:/output/bink ./bink
@@ -45,7 +49,7 @@ build-vm-image:
 # Build the cluster container image
 build-cluster-image:
 	@echo "=== Building cluster container image ==="
-	podman build -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
 
 # Convert bootc image to qcow2 disk
@@ -76,7 +80,7 @@ build-images-container: build-disk
 # Build the populator image (skopeo pre-installed for fast volume population)
 build-populator-image:
 	@echo "=== Building cluster images populator ==="
-	podman build --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(POPULATOR_IMAGE) -f $(POPULATOR_DIR)/Containerfile $(POPULATOR_DIR)
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(POPULATOR_IMAGE) -f $(POPULATOR_DIR)/Containerfile $(POPULATOR_DIR)
 	@echo "✅ Populator image built: $(POPULATOR_IMAGE)"
 
 # Clean built images and disk
@@ -95,8 +99,8 @@ clean-disk:
 # Rebuild everything from scratch
 rebuild: clean all
 
-# Update embedded Calico CNI manifest (version read from internal/config/defaults.go)
-CALICO_VERSION := $(shell grep 'CalicoVersion' internal/config/defaults.go | head -1 | sed 's/.*"\(.*\)"/\1/')
+# Update embedded Calico CNI manifest
+CALICO_VERSION := $(call extract,CalicoVersion )
 CALICO_MANIFEST := internal/cluster/calico.yaml
 
 update-calico:
