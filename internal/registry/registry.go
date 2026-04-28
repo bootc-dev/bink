@@ -7,10 +7,10 @@ import (
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
-	"github.com/containers/podman/v6/libpod/define"
-	"github.com/containers/podman/v6/pkg/specgen"
+	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/sirupsen/logrus"
-	nettypes "go.podman.io/common/libnetwork/types"
+	nettypes "github.com/containers/common/libnetwork/types"
 )
 
 type Manager struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	registrypkg "github.com/bootc-dev/bink/internal/registry"
-	"github.com/containers/podman/v6/libpod/define"
+	"github.com/containers/podman/v5/libpod/define"
 	"github.com/spf13/cobra"
 )
 

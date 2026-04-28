@@ -10,16 +10,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/podman/v6/pkg/api/handlers"
-	"github.com/containers/podman/v6/pkg/bindings"
-	"github.com/containers/podman/v6/pkg/bindings/containers"
-	"github.com/containers/podman/v6/pkg/bindings/images"
-	"github.com/containers/podman/v6/pkg/bindings/network"
-	"github.com/containers/podman/v6/pkg/bindings/volumes"
-	"github.com/containers/podman/v6/pkg/domain/entities"
-	"github.com/containers/podman/v6/pkg/specgen"
+	"github.com/containers/podman/v5/pkg/api/handlers"
+	"github.com/containers/podman/v5/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/bindings/images"
+	"github.com/containers/podman/v5/pkg/bindings/network"
+	"github.com/containers/podman/v5/pkg/bindings/volumes"
+	"github.com/containers/podman/v5/pkg/domain/entities"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/sirupsen/logrus"
-	nettypes "go.podman.io/common/libnetwork/types"
+	nettypes "github.com/containers/common/libnetwork/types"
 )
 
 type Client struct {

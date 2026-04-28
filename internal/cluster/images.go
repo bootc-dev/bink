@@ -7,7 +7,7 @@ import (
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
-	"github.com/containers/podman/v6/pkg/specgen"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/sirupsen/logrus"
 )
 
