@@ -26,10 +26,6 @@ The project currently has no unit tests. Add comprehensive unit tests for core i
 
 Image references are scattered across `internal/config/defaults.go`, `internal/cluster/init.go`, `internal/cluster/images.go`, Containerfiles, and test files. Centralize all image references (including Calico version `v3.27.0`, base Fedora `quay.io/fedora/fedora:43`, registry `docker.io/library/registry:2`, and test images like `quay.io/libpod/busybox:latest`) into a single configuration source so they can be updated in one place.
 
-### Replace SSH+kubectl with Kubernetes Client-Go
-
-Currently, `internal/cluster/init.go` and `internal/cluster/join.go` run `kubectl` commands via SSH to apply the Calico CNI manifest, patch CoreDNS, and label worker nodes. Replace these with direct Kubernetes API calls using `k8s.io/client-go` by creating an `internal/kube` package.
-
 ### Replace entrypoint.sh with a Go Supervisor Binary
 
 Currently, `containerfiles/vm/entrypoint.sh` is a bash script that starts `virtlogd`, `virtstoraged`, and `virtnetworkd` as background processes, then runs `virtqemud` in the foreground. Replace this with a small Go binary that starts and monitors all four libvirt daemons, restarts any that crash, and reports health status. This gives proper process supervision inside the container (restart policies, structured logging, health checks) without pulling in a full init system.
