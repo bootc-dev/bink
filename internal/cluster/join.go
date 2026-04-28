@@ -89,11 +89,17 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 		c.logger.Info("")
 		c.logger.Infof("=== Labeling %s as worker ===", nodeName)
 
-		labelCmd := fmt.Sprintf("sudo kubectl label node %s node-role.kubernetes.io/worker=worker --overwrite --kubeconfig=/etc/kubernetes/admin.conf", nodeName)
-		if err := cpSSHClient.ExecWithOutput(ctx, labelCmd); err != nil {
-			c.logger.Warnf("Failed to label node as worker (non-fatal): %v", err)
+		containerName := fmt.Sprintf("k8s-%s-%s", c.name, controlPlane)
+		kubeClient, err := c.newKubeClient(ctx, cpSSHClient, containerName)
+		if err != nil {
+			c.logger.Warnf("Failed to create kubernetes client (non-fatal): %v", err)
 		} else {
-			c.logger.Infof("✅ Node %s labeled as worker", nodeName)
+			labels := map[string]string{"node-role.kubernetes.io/worker": "worker"}
+			if err := kubeClient.LabelNode(ctx, nodeName, labels); err != nil {
+				c.logger.Warnf("Failed to label node as worker (non-fatal): %v", err)
+			} else {
+				c.logger.Infof("✅ Node %s labeled as worker", nodeName)
+			}
 		}
 	}
 

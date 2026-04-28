@@ -5,12 +5,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os"
 	"os/exec"
 	"text/template"
 	"time"
 
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/kube"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
@@ -102,9 +102,15 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	c.logger.Info("")
 
+	// Build a Kubernetes client for the remaining operations
+	kubeClient, err := c.newKubeClient(ctx, sshClient, containerName)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
 	// Install Calico CNI
 	c.logger.Info("=== Installing Calico CNI plugin ===")
-	if err := c.installCalicoCNI(ctx, containerName, sshClient); err != nil {
+	if err := kubeClient.Apply(ctx, calicoManifest); err != nil {
 		return fmt.Errorf("failed to install Calico: %w", err)
 	}
 
@@ -114,8 +120,8 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	// for non-root users, so NET_BIND_SERVICE doesn't take effect for UID 65532
 	c.logger.Info("")
 	c.logger.Info("=== Patching CoreDNS for CRI-O compatibility ===")
-	corednsPatch := `kubectl patch deployment -n kube-system coredns --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/securityContext", "value": {"capabilities": {"add": ["NET_BIND_SERVICE"], "drop": ["ALL"]}, "readOnlyRootFilesystem": true, "runAsUser": 0, "runAsGroup": 0}}]'`
-	if _, err := sshClient.Exec(ctx, corednsPatch); err != nil {
+	corednsPatch := `[{"op": "replace", "path": "/spec/template/spec/containers/0/securityContext", "value": {"capabilities": {"add": ["NET_BIND_SERVICE"], "drop": ["ALL"]}, "readOnlyRootFilesystem": true, "runAsUser": 0, "runAsGroup": 0}}]`
+	if err := kubeClient.PatchDeployment(ctx, "kube-system", "coredns", []byte(corednsPatch)); err != nil {
 		return fmt.Errorf("failed to patch CoreDNS: %w", err)
 	}
 
@@ -128,33 +134,21 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	return nil
 }
 
-// installCalicoCNI copies the embedded Calico manifest to the VM and applies it
-func (c *Cluster) installCalicoCNI(ctx context.Context, containerName string, sshClient *ssh.Client) error {
-	tmpFile, err := os.CreateTemp("", "calico-*.yaml")
+// newKubeClient fetches kubeconfig from the VM and creates a Kubernetes client
+// that connects through the container's published API port.
+func (c *Cluster) newKubeClient(ctx context.Context, sshClient *ssh.Client, containerName string) (*kube.Client, error) {
+	kubeconfigContent, err := sshClient.Exec(ctx, "cat ~/.kube/config")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.Write(calicoManifest); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to write manifest: %w", err)
-	}
-	tmpFile.Close()
-
-	if err := c.podmanClient.ContainerCopy(ctx, tmpFile.Name(), containerName, "/tmp/calico.yaml"); err != nil {
-		return fmt.Errorf("failed to copy manifest to container: %w", err)
+		return nil, fmt.Errorf("fetching kubeconfig: %w", err)
 	}
 
-	if err := sshClient.CopyTo(ctx, "/tmp/calico.yaml", "/tmp/calico.yaml"); err != nil {
-		return fmt.Errorf("failed to copy manifest to VM: %w", err)
+	hostPort, err := c.podmanClient.GetPublishedPort(ctx, containerName, "6443/tcp")
+	if err != nil {
+		return nil, fmt.Errorf("getting API server port: %w", err)
 	}
 
-	if _, err := sshClient.Exec(ctx, "kubectl apply -f /tmp/calico.yaml"); err != nil {
-		return fmt.Errorf("failed to apply manifest: %w", err)
-	}
-
-	return nil
+	serverURL := fmt.Sprintf("https://localhost:%d", hostPort)
+	return kube.NewFromKubeconfig([]byte(kubeconfigContent), serverURL)
 }
 
 // createKubeadmConfig creates the kubeadm config file in the container
