@@ -150,3 +150,7 @@ Image references are scattered across `internal/config/defaults.go`, `internal/c
 
 Currently, `internal/cluster/init.go` and `internal/cluster/join.go` run `kubectl` commands via SSH to apply the Calico CNI manifest, patch CoreDNS, and label worker nodes. Replace these with direct Kubernetes API calls using `k8s.io/client-go` by creating an `internal/kube` package.
 
+### Replace entrypoint.sh with a Go Supervisor Binary
+
+Currently, `containerfiles/vm/entrypoint.sh` is a bash script that starts `virtlogd`, `virtstoraged`, and `virtnetworkd` as background processes, then runs `virtqemud` in the foreground. Replace this with a small Go binary that starts and monitors all four libvirt daemons, restarts any that crash, and reports health status. This gives proper process supervision inside the container (restart policies, structured logging, health checks) without pulling in a full init system.
+
