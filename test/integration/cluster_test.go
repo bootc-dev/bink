@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/bootc-dev/bink/internal/node"
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
 
@@ -69,7 +70,8 @@ var _ = Describe("Cluster Lifecycle", func() {
 			By("Verifying cluster-hosts file is configured")
 			hostsFile := helpers.SSHExec(clusterName, "node1", "cat /var/lib/dnsmasq/cluster-hosts")
 			Expect(hostsFile).To(ContainSubstring("node1"), "cluster-hosts should contain node1")
-			Expect(hostsFile).To(ContainSubstring("10.0.0.32"), "cluster-hosts should contain node1 IP")
+			expectedIP := node.CalculateClusterIP(clusterName, "node1")
+			Expect(hostsFile).To(ContainSubstring(expectedIP), "cluster-hosts should contain node1 IP")
 
 			By("Exposing API and creating Kubernetes client")
 			kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)

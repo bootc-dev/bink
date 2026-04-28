@@ -89,8 +89,8 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 	n.ContainerName = config.ContainerNamePrefix + clusterLabel + "-" + name
 
 	// Set cluster IP and MAC
-	n.ClusterIP = CalculateClusterIP(name)
-	n.ClusterMAC = CalculateClusterMAC(name)
+	n.ClusterIP = CalculateClusterIP(clusterLabel, name)
+	n.ClusterMAC = CalculateClusterMAC(clusterLabel, name)
 
 	// Handle API port logic
 	switch n.APIPort {

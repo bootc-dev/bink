@@ -41,7 +41,7 @@ func (n *Node) newCloudInitData(sshPubKey string) CloudInitData {
 	return CloudInitData{
 		NodeName:         n.Name,
 		ClusterIP:        n.ClusterIP,
-		Node1IP:          CalculateClusterIP("node1"),
+		Node1IP:          CalculateClusterIP(n.ClusterName, "node1"),
 		IsNode1:          n.Name == "node1",
 		SSHUser:          config.DefaultSSHUser,
 		SSHPubKey:        strings.TrimSpace(sshPubKey),

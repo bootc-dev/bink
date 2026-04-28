@@ -30,11 +30,11 @@ func runSSH(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	logger := logrus.New()
 
-	// Get node IP for display
-	clusterIP := node.CalculateClusterIP(nodeName)
-
 	// Get cluster name
 	clusterName := viper.GetString("cluster.name")
+
+	// Get node IP for display
+	clusterIP := node.CalculateClusterIP(clusterName, nodeName)
 
 	// Create SSH client
 	sshClient := ssh.NewClientForNode(clusterName, nodeName, logger)

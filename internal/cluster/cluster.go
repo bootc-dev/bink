@@ -107,5 +107,5 @@ func (c *Cluster) WaitForCloudInit(ctx context.Context, nodeName string, timeout
 
 // GetNodeClusterIP returns the cluster IP for a node
 func (c *Cluster) GetNodeClusterIP(nodeName string) string {
-	return node.CalculateClusterIP(nodeName)
+	return node.CalculateClusterIP(c.name, nodeName)
 }
