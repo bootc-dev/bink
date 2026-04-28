@@ -7,7 +7,6 @@ import (
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/virsh"
-	"github.com/bootc-dev/bink/internal/virtiofsd"
 	"github.com/containers/podman/v6/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -66,7 +65,7 @@ func (n *Node) createContainer(ctx context.Context) error {
 			{
 				Name:    clusterImagesVolume,
 				Dest:    "/var/lib/cluster-images",
-				Options: []string{"z", "ro"},
+				Options: []string{"z"},
 			},
 		},
 		Labels: map[string]string{
@@ -155,34 +154,6 @@ func (n *Node) setupSSHKeys(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) setupVirtiofsd(ctx context.Context) error {
-	logrus.Info("Setting up virtiofsd for cluster images")
-
-	// Socket path matches what libvirt expects
-	socketDir := fmt.Sprintf("/var/lib/libvirt/qemu/domain-1-%s", n.Name)
-	socketPath := fmt.Sprintf("%s/fs0-fs.sock", socketDir)
-
-	// Create virtiofsd manager with options based on podman-bootc approach
-	opts := &virtiofsd.Options{
-		ContainerName: n.ContainerName,
-		NodeName:      n.Name,
-		SharedDir:     "/var/lib/cluster-images",
-		SocketPath:    socketPath,
-		Cache:         "auto",
-		Sandbox:       "none",
-		ModCaps:       "-mknod", // Disable mknod capability to avoid kernel sync errors
-	}
-
-	n.virtiofsdMgr = virtiofsd.NewManager(n.podman, opts)
-
-	// Start the virtiofsd process with proper lifecycle management
-	if err := n.virtiofsdMgr.Start(ctx, opts); err != nil {
-		return fmt.Errorf("starting virtiofsd: %w", err)
-	}
-
-	return nil
-}
-
 func (n *Node) createOverlayDisk(ctx context.Context) error {
 	overlayPath := fmt.Sprintf("/workspace/%s.qcow2", n.Name)
 
@@ -228,7 +199,7 @@ func (n *Node) createVM(ctx context.Context) error {
 		},
 		Filesystems: []virsh.FilesystemConfig{
 			{
-				Source:     "/var/lib/cluster-images",
+				Source:     config.VirtiofsSharedDir,
 				Target:     "cluster_images",
 				AccessMode: "passthrough",
 				ReadOnly:   false,
@@ -237,7 +208,7 @@ func (n *Node) createVM(ctx context.Context) error {
 		XMLModifications: []string{
 			"xpath.set=./devices/interface[2]/source/@address=" + config.MulticastAddr,
 			fmt.Sprintf("xpath.set=./devices/interface[2]/source/@port=%d", config.MulticastPort),
-			fmt.Sprintf("xpath.set=./devices/filesystem/source/@socket=/var/lib/libvirt/qemu/domain-1-%s/fs0-fs.sock", n.Name),
+			"xpath.set=./devices/filesystem/source/@socket=" + config.VirtiofsSocketPath,
 		},
 	}
 
