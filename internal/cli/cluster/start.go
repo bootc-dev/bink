@@ -15,7 +15,7 @@ import (
 )
 
 func newStartCmd() *cobra.Command {
-	var imagesImage string
+	var nodeImage string
 	var apiPort int
 	var memory int
 
@@ -25,18 +25,18 @@ func newStartCmd() *cobra.Command {
 		Long:  "Create network, control plane node, and initialize Kubernetes cluster with kubeadm",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, imagesImage, apiPort, memory)
+			return runStart(cmd.Context(), logger, nodeImage, apiPort, memory)
 		},
 	}
 
-	cmd.Flags().StringVar(&imagesImage, "images-image", config.DefaultBootcImagesImage, "Container image containing base VM images")
+	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().IntVar(&apiPort, "api-port", 0, "API server port to expose (0 = auto-assign random port)")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 8192 MB)")
 
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, apiPort int, memory int) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiPort int, memory int) error {
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -75,7 +75,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 	logger.Info("")
 
 	logger.Info("Step 4: Creating control plane node (node1)...")
-	logger.Infof("VM images container: %s", imagesImage)
+	logger.Infof("Node image: %s", nodeImage)
 
 	// Convert 0 to -1 for auto-assign (to distinguish from unset)
 	if apiPort == 0 {
@@ -83,7 +83,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, imagesImage string, ap
 	}
 
 	controlPlane, err := node.New("node1", true,
-		node.WithImagesImage(imagesImage),
+		node.WithNodeImage(nodeImage),
 		node.WithClusterName(clusterName),
 		node.WithAPIPort(apiPort),
 		node.WithMemory(memory),

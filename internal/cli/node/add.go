@@ -16,7 +16,7 @@ import (
 
 func newAddCmd() *cobra.Command {
 	var controlPlane string
-	var imagesImage string
+	var nodeImage string
 	var role string
 	var memory int
 
@@ -27,19 +27,19 @@ func newAddCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runAdd(cmd.Context(), args[0], controlPlane, imagesImage, role, memory, logger)
+			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, logger)
 		},
 	}
 
 	cmd.Flags().StringVarP(&controlPlane, "control-plane", "c", "node1", "Control plane node name")
-	cmd.Flags().StringVar(&imagesImage, "images-image", config.DefaultBootcImagesImage, "Container image containing base VM images")
+	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().StringVarP(&role, "role", "r", "worker", "Node role: worker or control-plane")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 8192 MB)")
 
 	return cmd
 }
 
-func runAdd(ctx context.Context, nodeName, controlPlane, imagesImage, role string, memory int, logger *logrus.Logger) error {
+func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, logger *logrus.Logger) error {
 	// Validate and convert role to boolean
 	var isControlPlane bool
 	switch role {
@@ -56,12 +56,12 @@ func runAdd(ctx context.Context, nodeName, controlPlane, imagesImage, role strin
 
 	// Step 1: Create the new node
 	logger.Infof("Step 1: Creating %s node...", role)
-	logger.Infof("VM images container: %s", imagesImage)
+	logger.Infof("Node image: %s", nodeImage)
 
 	clusterName := viper.GetString("cluster.name")
 
 	nodeOpts := []node.NodeOption{
-		node.WithImagesImage(imagesImage),
+		node.WithNodeImage(nodeImage),
 		node.WithClusterName(clusterName),
 		node.WithMemory(memory),
 	}

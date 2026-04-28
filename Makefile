@@ -6,7 +6,7 @@ extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
 
 BOOTC_IMAGE := $(call extract,DefaultBootcImage )
 CLUSTER_IMAGE := $(call extract,DefaultClusterImage )
-IMAGES_CONTAINER := $(call extract,DefaultBootcImagesImage )
+NODE_IMAGE := $(call extract,DefaultNodeImage )
 POPULATOR_IMAGE := $(call extract,DefaultPopulatorImage )
 FEDORA_VERSION := $(call extract,FedoraVersion )
 KUBE_MINOR := $(call extract,KubernetesMinorVersion )
@@ -68,14 +68,14 @@ build-disk: build-vm-image
 
 # Build container image with qcow2 disk for image volume mounting
 build-images-container: build-disk
-	@echo "=== Building images container with qcow2 disk ==="
+	@echo "=== Building node image with qcow2 disk ==="
 	@echo "FROM scratch" > $(OUTPUT_DIR)/Containerfile.images
 	@echo "COPY $(DISK_IMAGE) /$(DISK_IMAGE)" >> $(OUTPUT_DIR)/Containerfile.images
-	podman build -t $(IMAGES_CONTAINER) -f $(OUTPUT_DIR)/Containerfile.images $(OUTPUT_DIR)
+	podman build -t $(NODE_IMAGE) -f $(OUTPUT_DIR)/Containerfile.images $(OUTPUT_DIR)
 	@rm -f $(OUTPUT_DIR)/Containerfile.images
-	@echo "✅ Images container built: $(IMAGES_CONTAINER)"
+	@echo "✅ Node image built: $(NODE_IMAGE)"
 	@echo ""
-	@echo "This image can be used with: bink cluster start --images-image $(IMAGES_CONTAINER)"
+	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
 
 # Build the populator image (skopeo pre-installed for fast volume population)
 build-populator-image:
@@ -86,7 +86,7 @@ build-populator-image:
 # Clean built images and disk
 clean:
 	@echo "=== Cleaning up ==="
-	podman rmi -f $(BOOTC_IMAGE) $(CLUSTER_IMAGE) $(IMAGES_CONTAINER) $(POPULATOR_IMAGE) 2>/dev/null || true
+	podman rmi -f $(BOOTC_IMAGE) $(CLUSTER_IMAGE) $(NODE_IMAGE) $(POPULATOR_IMAGE) 2>/dev/null || true
 	rm -f $(OUTPUT_DIR)/$(DISK_IMAGE)
 	@echo "✅ Cleaned up images and disk"
 
@@ -153,5 +153,5 @@ help:
 	@echo "  Binary:         $(BINK_BINARY)"
 	@echo "  VM image:       $(BOOTC_IMAGE)"
 	@echo "  Cluster image:  $(CLUSTER_IMAGE)"
-	@echo "  Images volume:  $(IMAGES_CONTAINER)"
+	@echo "  Node image:     $(NODE_IMAGE)"
 	@echo "  Disk image:     $(OUTPUT_DIR)/$(DISK_IMAGE)"

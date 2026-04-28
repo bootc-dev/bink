@@ -24,7 +24,7 @@ func (n *Node) createContainer(ctx context.Context) error {
 	}
 
 	logrus.Infof("Creating container %s", n.ContainerName)
-	logrus.Infof("Using images container: %s", n.ImagesImage)
+	logrus.Infof("Using node image: %s", n.NodeImage)
 
 	// Cluster images volume is shared across all clusters (same images for all)
 	clusterImagesVolume := "cluster-images"
@@ -52,7 +52,7 @@ func (n *Node) createContainer(ctx context.Context) error {
 		},
 		ImageVolumes: []*specgen.ImageVolume{
 			{
-				Source:      n.ImagesImage,
+				Source:      n.NodeImage,
 				Destination: "/images",
 			},
 		},

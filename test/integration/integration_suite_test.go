@@ -21,7 +21,7 @@ var _ = SynchronizedBeforeSuite(func() {
 	helpers.RequireCommand("podman")
 	helpers.RequireBink()
 	helpers.RequireImage(config.DefaultClusterImage)
-	helpers.RequireImage(config.DefaultBootcImagesImage)
+	helpers.RequireImage(config.DefaultNodeImage)
 
 	GinkgoWriter.Println("✓ All prerequisites verified")
 }, func() {})

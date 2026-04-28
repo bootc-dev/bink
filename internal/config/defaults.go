@@ -6,9 +6,9 @@ const (
 
 	FedoraVersion = "43"
 
-	DefaultClusterImage     = "localhost/cluster:latest"
-	DefaultBootcImage       = "localhost/fedora-bootc-k8s:latest"
-	DefaultBootcImagesImage = "localhost/fedora-bootc-k8s-image:latest"
+	DefaultClusterImage = "localhost/cluster:latest"
+	DefaultBootcImage   = "localhost/fedora-bootc-k8s:latest"
+	DefaultNodeImage    = "localhost/fedora-bootc-k8s-image:latest"
 	DefaultPopulatorImage   = "localhost/cluster-images-populator:latest"
 
 	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"

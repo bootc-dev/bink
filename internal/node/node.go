@@ -19,7 +19,7 @@ type Node struct {
 	Memory          int
 	VCPUs           int
 	BaseDisk        string
-	ImagesImage     string
+	NodeImage     string
 	APIPort         int // Configured API port (0 = auto-assign)
 	AssignedAPIPort int // Actual assigned port after container creation
 
@@ -29,9 +29,9 @@ type Node struct {
 
 type NodeOption func(*Node) error
 
-func WithImagesImage(image string) NodeOption {
+func WithNodeImage(image string) NodeOption {
 	return func(n *Node) error {
-		n.ImagesImage = image
+		n.NodeImage = image
 		return nil
 	}
 }
@@ -61,7 +61,7 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 	n := &Node{
 		Name:           name,
 		IsControlPlane: isControlPlane,
-		ImagesImage:    config.DefaultBootcImagesImage,
+		NodeImage:    config.DefaultNodeImage,
 		Memory:         config.DefaultMemory,
 		VCPUs:          config.DefaultVCPUs,
 		BaseDisk:       config.DefaultBaseDisk,
