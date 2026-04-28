@@ -34,8 +34,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	// Check for CONTAINER_HOST environment variable first (like podman CLI does)
 	defaultSocketPath := os.Getenv("CONTAINER_HOST")
 	if defaultSocketPath == "" {
-		uid := os.Getuid()
-		defaultSocketPath = fmt.Sprintf("unix:///run/user/%d/podman/podman.sock", uid)
+		defaultSocketPath = "unix://" + findPodmanSocket()
 	}
 
 	c := &Client{
@@ -48,6 +47,26 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 
 	return c, nil
+}
+
+func findPodmanSocket() string {
+	uid := os.Getuid()
+	candidates := []string{}
+
+	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
+		candidates = append(candidates, filepath.Join(xdg, "podman", "podman.sock"))
+	}
+	candidates = append(candidates,
+		fmt.Sprintf("/run/user/%d/podman/podman.sock", uid),
+		"/run/podman/podman.sock",
+	)
+
+	for _, path := range candidates {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return candidates[0]
 }
 
 func (c *Client) ensureConnection() error {
