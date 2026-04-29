@@ -18,9 +18,9 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Build using bind mount - source is mounted read-only, binary written to /output
+# Copy source and build
+COPY . /src
 WORKDIR /output
-RUN --mount=type=bind,source=.,target=/src,rw \
-    --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     cd /src && CGO_ENABLED=1 go build -o /output/bink ./cmd/bink
