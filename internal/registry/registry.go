@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -34,23 +35,7 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 	}
 
 	if exists {
-		status, err := m.podman.ContainerStatus(ctx, config.RegistryContainerName)
-		if err != nil {
-			return fmt.Errorf("checking registry status: %w", err)
-		}
-
-		switch status {
-		case define.ContainerStateRunning.String():
-			logrus.Info("Registry already running")
-			return nil
-		default:
-			logrus.Infof("Registry container exists but is %s, starting it", status)
-			if err := m.podman.ContainerStart(ctx, config.RegistryContainerName); err != nil {
-				return fmt.Errorf("starting registry: %w", err)
-			}
-			logrus.Info("Registry started")
-			return nil
-		}
+		return m.ensureRunning(ctx)
 	}
 
 	logrus.Info("Creating registry container")
@@ -87,11 +72,34 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 	}
 
 	if _, err := m.podman.ContainerCreate(ctx, opts); err != nil {
+		if strings.Contains(err.Error(), "is already in use") {
+			logrus.Info("Registry container was created concurrently, ensuring it is running")
+			return m.ensureRunning(ctx)
+		}
 		return fmt.Errorf("creating registry container: %w", err)
 	}
 
 	logrus.Infof("Registry running at %s:%d (host: localhost:%d)",
 		config.RegistryStaticIP, config.RegistryPort, config.RegistryPort)
+	return nil
+}
+
+func (m *Manager) ensureRunning(ctx context.Context) error {
+	status, err := m.podman.ContainerStatus(ctx, config.RegistryContainerName)
+	if err != nil {
+		return fmt.Errorf("checking registry status: %w", err)
+	}
+
+	if status == define.ContainerStateRunning.String() {
+		logrus.Info("Registry already running")
+		return nil
+	}
+
+	logrus.Infof("Registry container is %s, starting it", status)
+	if err := m.podman.ContainerStart(ctx, config.RegistryContainerName); err != nil {
+		return fmt.Errorf("starting registry: %w", err)
+	}
+	logrus.Info("Registry started")
 	return nil
 }
 
