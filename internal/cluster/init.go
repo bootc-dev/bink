@@ -148,7 +148,7 @@ func (c *Cluster) newKubeClient(ctx context.Context, sshClient *ssh.Client, cont
 	}
 
 	serverURL := fmt.Sprintf("https://localhost:%d", hostPort)
-	return kube.NewFromKubeconfig([]byte(kubeconfigContent), serverURL)
+	return kube.NewFromKubeconfig(ctx, []byte(kubeconfigContent), serverURL)
 }
 
 // createKubeadmConfig creates the kubeadm config file in the container

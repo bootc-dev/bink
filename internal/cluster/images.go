@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -139,14 +140,29 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 
 	logrus.Infof("Found %d images to pull", len(images))
 
-	// Pull each image using skopeo
+	// Pull each image using skopeo with a per-image timeout
+	pullTimeout := time.Duration(config.DefaultImagePullTimeout) * time.Second
+	maxRetries := 2
 	for i, image := range images {
-		logrus.Infof("[%d/%d] Pulling %s", i+1, len(images), image)
+		var lastErr error
+		for attempt := range maxRetries {
+			if attempt > 0 {
+				logrus.Infof("[%d/%d] Retrying %s (attempt %d/%d)", i+1, len(images), image, attempt+1, maxRetries)
+			} else {
+				logrus.Infof("[%d/%d] Pulling %s", i+1, len(images), image)
+			}
 
-		if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
-			[]string{"skopeo", "copy", "docker://" + image, "containers-storage:" + image}); err != nil {
-			logrus.Warnf("Failed to pull %s: %v (continuing...)", image, err)
-			continue
+			pullCtx, cancel := context.WithTimeout(ctx, pullTimeout)
+			lastErr = c.podmanClient.ContainerExecQuiet(pullCtx, tmpContainer,
+				[]string{"skopeo", "copy", "docker://" + image, "containers-storage:" + image})
+			cancel()
+
+			if lastErr == nil {
+				break
+			}
+		}
+		if lastErr != nil {
+			logrus.Warnf("Failed to pull %s: %v (continuing...)", image, lastErr)
 		}
 	}
 

@@ -73,4 +73,6 @@ const (
 	DefaultSSHTimeout       = 60
 	DefaultCloudInitTimeout = 300
 	DefaultRetryInterval    = 2
+
+	DefaultImagePullTimeout = 600
 )

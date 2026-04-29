@@ -1,11 +1,14 @@
 package kube
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -19,7 +22,7 @@ type Client struct {
 // NewFromKubeconfig creates a Client from raw kubeconfig bytes.
 // If serverURL is non-empty, it overrides the server in the kubeconfig
 // (e.g. "https://localhost:12345" when connecting through a published port).
-func NewFromKubeconfig(kubeconfigBytes []byte, serverURL string) (*Client, error) {
+func NewFromKubeconfig(ctx context.Context, kubeconfigBytes []byte, serverURL string) (*Client, error) {
 	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigBytes)
 	if err != nil {
 		return nil, fmt.Errorf("parsing kubeconfig: %w", err)
@@ -34,6 +37,10 @@ func NewFromKubeconfig(kubeconfigBytes []byte, serverURL string) (*Client, error
 	config.TLSClientConfig.Insecure = true
 	config.TLSClientConfig.CAData = nil
 	config.TLSClientConfig.CAFile = ""
+
+	if err := waitForAPI(ctx, config); err != nil {
+		return nil, fmt.Errorf("waiting for API server: %w", err)
+	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -53,4 +60,29 @@ func NewFromKubeconfig(kubeconfigBytes []byte, serverURL string) (*Client, error
 		dynamic:   dynamicClient,
 		mapper:    mapper,
 	}, nil
+}
+
+func waitForAPI(ctx context.Context, config *rest.Config) error {
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	deadline := time.After(2 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline:
+			return fmt.Errorf("timed out waiting for API server at %s", config.Host)
+		case <-ticker.C:
+			_, err := clientset.Discovery().ServerVersion()
+			if err == nil {
+				return nil
+			}
+		}
+	}
 }
