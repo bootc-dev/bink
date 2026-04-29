@@ -61,6 +61,11 @@ const (
 	RegistryHostname      = "registry"
 	RegistryVolume        = "bink-registry-data"
 
+	HAProxyImage         = "docker.io/library/haproxy:lts-alpine"
+	HAProxyContainerName = "haproxy"
+	HAProxyPort          = 6443
+	HAProxyConfigPath    = "/tmp/haproxy.cfg"
+
 	TestBusyboxImage = "quay.io/libpod/busybox:latest"
 
 	CloudInitVolID = "cidata"
