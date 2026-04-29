@@ -151,6 +151,14 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName string) e
 	}
 
 	logrus.Info("✓ All images pulled successfully")
+
+	// Make volume contents world-readable so virtiofsd (running as qemu user) can serve them
+	logrus.Info("Setting volume permissions for virtiofsd access...")
+	if err := c.podmanClient.ContainerExecQuiet(ctx, tmpContainer,
+		[]string{"chmod", "-R", "a+rX", "/var/lib/containers/storage"}); err != nil {
+		return fmt.Errorf("setting volume permissions: %w", err)
+	}
+
 	return nil
 }
 
