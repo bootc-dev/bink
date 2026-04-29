@@ -77,6 +77,9 @@ func runClusterList(ctx context.Context, logger *logrus.Logger) error {
 			continue
 		}
 		nodeName = strings.TrimSpace(nodeName)
+		if nodeName == "" {
+			continue
+		}
 
 		// Get container state
 		state, err := podmanClient.ContainerInspect(ctx, containerName, "{{.State.Status}}")
