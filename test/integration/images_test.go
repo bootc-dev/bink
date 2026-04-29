@@ -24,12 +24,24 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 
 		_ = podmanClient.ContainerRemove(ctx, cluster.PopulatorContainerName, true)
 
-		exists, err := podmanClient.VolumeExists(ctx, cluster.ClusterImagesVolume)
+		// Remove containers using the volume before removing it
+		containers, err := podmanClient.ContainerList(ctx, "")
 		Expect(err).ToNot(HaveOccurred())
-		if exists {
-			err = podmanClient.VolumeRemove(ctx, cluster.ClusterImagesVolume)
-			Expect(err).ToNot(HaveOccurred())
+		for _, name := range containers {
+			_ = podmanClient.ContainerStop(ctx, name)
+			_ = podmanClient.ContainerRemove(ctx, name, true)
 		}
+
+		Eventually(func() error {
+			exists, err := podmanClient.VolumeExists(ctx, cluster.ClusterImagesVolume)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return nil
+			}
+			return podmanClient.VolumeRemove(ctx, cluster.ClusterImagesVolume)
+		}, 30*time.Second, 2*time.Second).Should(Succeed())
 	})
 
 	AfterEach(func() {
