@@ -6,6 +6,7 @@ import (
 
 	"github.com/bootc-dev/bink/internal/cluster"
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/node"
 	"github.com/bootc-dev/bink/internal/registry"
@@ -115,6 +116,18 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 
 	logger.Info("")
+
+	logger.Info("Step 6: Creating HAProxy load balancer...")
+	haproxyMgr, err := haproxy.NewManager(clusterName)
+	if err != nil {
+		return fmt.Errorf("creating haproxy manager: %w", err)
+	}
+	// Use auto-assigned port (0) for HAProxy — the user-specified apiPort is for the node
+	if err := haproxyMgr.EnsureHAProxy(ctx, 0); err != nil {
+		return fmt.Errorf("creating HAProxy load balancer: %w", err)
+	}
+	logger.Info("")
+
 	logger.Info("✅ Cluster created successfully!")
 	logger.Info("")
 	logger.Info("Local registry:")

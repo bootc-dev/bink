@@ -11,6 +11,7 @@ import (
 	"github.com/bootc-dev/bink/internal/cluster"
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/dns"
+	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/node"
 )
 
@@ -115,6 +116,19 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		IsControlPlane: isControlPlane,
 	}); err != nil {
 		return fmt.Errorf("joining node to cluster: %w", err)
+	}
+
+	// Step 4: Update HAProxy if adding a control-plane node
+	if isControlPlane {
+		logger.Info("")
+		logger.Info("Step 4: Updating HAProxy load balancer...")
+		haproxyMgr, err := haproxy.NewManager(clusterName)
+		if err != nil {
+			return fmt.Errorf("creating haproxy manager: %w", err)
+		}
+		if err := haproxyMgr.UpdateConfig(ctx); err != nil {
+			logger.Warnf("Failed to update HAProxy (non-fatal): %v", err)
+		}
 	}
 
 	return nil

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
@@ -23,21 +24,21 @@ func newExposeCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "expose",
-		Short: "Expose API server to localhost via published port",
-		Long: `Expose the Kubernetes API server to localhost via passt port forwarding.
+		Short: "Expose API server to localhost via HAProxy load balancer",
+		Long: `Expose the Kubernetes API server to localhost via the HAProxy load balancer.
 
 This command:
-1. Detects the published API server port on the host (e.g., 6443, 6444, or auto-assigned)
-2. Verifies the API server is reachable inside the container via passt port forwarding
-3. Generates a kubeconfig file configured to use localhost:<published-port>
-4. Requires the container to have port 6443 published (handled by 'bink cluster start')`,
+1. Detects the HAProxy load balancer container for the cluster
+2. Gets the published port on the host
+3. Verifies API server reachability through HAProxy
+4. Generates a kubeconfig file configured to use localhost:<haproxy-port>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
 			return runExpose(cmd.Context(), logger, nodeName, kubeconfigPath)
 		},
 	}
 
-	cmd.Flags().StringVarP(&nodeName, "node", "n", "node1", "Node name (control plane)")
+	cmd.Flags().StringVarP(&nodeName, "node", "n", "", "Node name to fetch kubeconfig from (auto-detected if not set)")
 	cmd.Flags().StringVarP(&kubeconfigPath, "kubeconfig", "k", filepath.Join(config.DefaultKubeconfigDir, "kubeconfig"), "Path to save kubeconfig")
 
 	return cmd
@@ -51,53 +52,34 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 		kubeconfigPath = filepath.Join(config.DefaultKubeconfigDir, fmt.Sprintf("kubeconfig-%s", clusterName))
 	}
 
-	containerName := fmt.Sprintf("%s%s-%s", config.ContainerNamePrefix, clusterName, nodeName)
-
 	podmanClient, err := podman.NewClient()
 	if err != nil {
 		return fmt.Errorf("creating podman client: %w", err)
 	}
 
-	exists, err := podmanClient.ContainerExists(ctx, containerName)
+	// Get the HAProxy published port
+	haproxyMgr, err := haproxy.NewManager(clusterName)
 	if err != nil {
-		return fmt.Errorf("checking container existence: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("container %s does not exist", containerName)
+		return fmt.Errorf("creating haproxy manager: %w", err)
 	}
 
-	hostPort, err := podmanClient.GetPublishedPort(ctx, containerName, "6443/tcp")
+	hostPort, err := haproxyMgr.GetPublishedPort(ctx)
 	if err != nil {
-		logger.Error("Container does not have port 6443 published")
-		logger.Errorf("The container needs to be created with a published API port")
-		logger.Error("This is handled automatically by 'bink cluster start'")
-		return fmt.Errorf("container missing port 6443 publication: %w", err)
+		logger.Error("HAProxy load balancer not found or port not published")
+		logger.Error("This is created automatically by 'bink cluster start'")
+		return fmt.Errorf("HAProxy missing or port not published: %w", err)
 	}
 
-	logger.Infof("=== Exposing API server to localhost:%d ===", hostPort)
+	logger.Infof("=== Exposing API server to localhost:%d via HAProxy ===", hostPort)
 	logger.Info("")
-	logger.Infof("Container port 6443 is published on host port %d", hostPort)
 
-	logger.Info("Checking API server reachability via passt port forwarding...")
-
-	reachable := false
-	for i := 0; i < 5; i++ {
-		if checkAPIReachable(ctx, podmanClient, containerName) {
-			reachable = true
-			break
-		}
-		if i < 4 {
-			time.Sleep(2 * time.Second)
-		}
+	// Find a reachable control-plane node to fetch kubeconfig from
+	containerName, err := findReachableNode(ctx, podmanClient, clusterName, nodeName, logger)
+	if err != nil {
+		return err
 	}
 
-	if reachable {
-		logger.Info("API server is reachable on container port 6443")
-	} else {
-		logger.Warn("API server is not yet reachable on container port 6443, continuing anyway")
-	}
-
-	logger.Infof("API server exposed: localhost:%d -> container:6443 (passt) -> VM:6443", hostPort)
+	logger.Infof("API server exposed: localhost:%d -> HAProxy -> control-plane nodes:6443", hostPort)
 	logger.Info("")
 
 	logger.Infof("Generating kubeconfig at %s...", kubeconfigPath)
@@ -144,6 +126,74 @@ func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 	logger.Info("")
 
 	return nil
+}
+
+// findReachableNode finds a control-plane node that is reachable via SSH.
+// If nodeName is specified, it tries that node first. Otherwise it tries all
+// control-plane nodes in the cluster.
+func findReachableNode(ctx context.Context, podmanClient *podman.Client, clusterName, nodeName string, logger *logrus.Logger) (string, error) {
+	// Build candidate list
+	var candidates []string
+	if nodeName != "" {
+		candidates = append(candidates, fmt.Sprintf("%s%s-%s", config.ContainerNamePrefix, clusterName, nodeName))
+	}
+
+	// Discover all control-plane nodes
+	filter := fmt.Sprintf("label=bink.cluster-name=%s", clusterName)
+	containers, err := podmanClient.ContainerList(ctx, filter)
+	if err != nil {
+		return "", fmt.Errorf("listing cluster containers: %w", err)
+	}
+
+	for _, name := range containers {
+		component, _ := podmanClient.ContainerInspect(ctx, name, "{{index .Config.Labels \"bink.component\"}}")
+		if component != "" {
+			continue
+		}
+		_, err := podmanClient.GetPublishedPort(ctx, name, "6443/tcp")
+		if err != nil {
+			continue
+		}
+		// Avoid duplicating the explicitly requested node
+		if nodeName != "" {
+			explicit := fmt.Sprintf("%s%s-%s", config.ContainerNamePrefix, clusterName, nodeName)
+			if name == explicit {
+				continue
+			}
+		}
+		candidates = append(candidates, name)
+	}
+
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no control-plane nodes found for cluster %s", clusterName)
+	}
+
+	// Try each candidate
+	for _, containerName := range candidates {
+		exists, err := podmanClient.ContainerExists(ctx, containerName)
+		if err != nil || !exists {
+			continue
+		}
+
+		reachable := false
+		for i := 0; i < 3; i++ {
+			if checkAPIReachable(ctx, podmanClient, containerName) {
+				reachable = true
+				break
+			}
+			if i < 2 {
+				time.Sleep(2 * time.Second)
+			}
+		}
+
+		if reachable {
+			node, _ := podmanClient.ContainerInspect(ctx, containerName, "{{index .Config.Labels \"bink.node-name\"}}")
+			logger.Infof("Using control-plane node %s to fetch kubeconfig", node)
+			return containerName, nil
+		}
+	}
+
+	return "", fmt.Errorf("no reachable control-plane node found")
 }
 
 func checkAPIReachable(ctx context.Context, client *podman.Client, containerName string) bool {
