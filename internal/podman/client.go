@@ -295,8 +295,18 @@ func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string) (
 		WithAttachOutput(true).
 		WithAttachError(true)
 
-	if err := containers.ExecStartAndAttach(c.conn, sessionID, startOptions); err != nil {
-		return "", fmt.Errorf("executing command: %w", err)
+	execErr := make(chan error, 1)
+	go func() {
+		execErr <- containers.ExecStartAndAttach(c.conn, sessionID, startOptions)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("executing command: %w", ctx.Err())
+	case err := <-execErr:
+		if err != nil {
+			return "", fmt.Errorf("executing command: %w", err)
+		}
 	}
 
 	inspectData, err := containers.ExecInspect(c.conn, sessionID, nil)
@@ -333,8 +343,18 @@ func (c *Client) ContainerExecQuiet(ctx context.Context, name string, cmd []stri
 		WithAttachOutput(true).
 		WithAttachError(true)
 
-	if err := containers.ExecStartAndAttach(c.conn, sessionID, startOptions); err != nil {
-		return fmt.Errorf("executing command: %w", err)
+	execErr := make(chan error, 1)
+	go func() {
+		execErr <- containers.ExecStartAndAttach(c.conn, sessionID, startOptions)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("executing command: %w", ctx.Err())
+	case err := <-execErr:
+		if err != nil {
+			return fmt.Errorf("executing command: %w", err)
+		}
 	}
 
 	inspectData, err := containers.ExecInspect(c.conn, sessionID, nil)
