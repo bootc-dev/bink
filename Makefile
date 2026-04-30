@@ -52,19 +52,9 @@ build-cluster-image:
 	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
 
-# Convert bootc image to qcow2 disk
-build-disk: build-vm-image
-	@echo "=== Converting bootc image to disk ==="
-	@mkdir -p $(OUTPUT_DIR)
-	cd $(OUTPUT_DIR) && \
-	RUST_LOG=debug bcvk to-disk -K \
-		--karg 'console=tty0' \
-		--karg 'console=ttyS0,115200n8' \
-		--filesystem ext4 \
-		--format qcow2 \
-		--disk-size $(DISK_SIZE) \
-		$(BOOTC_IMAGE) $(DISK_IMAGE)
-	@echo "✅ Disk image created: $(OUTPUT_DIR)/$(DISK_IMAGE)"
+# Convert bootc image to qcow2 disk (runs bcvk inside a privileged container)
+build-disk: build-vm-image build-cluster-image
+	./hack/build-disk.sh
 
 # Build container image with qcow2 disk for image volume mounting
 build-images-container: build-disk
