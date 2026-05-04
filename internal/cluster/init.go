@@ -84,11 +84,12 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	c.logger.Info("✓ kubeadm config created at /etc/kubernetes/kubeadm-config.yaml")
 	c.logger.Info("")
 
-	// Initialize cluster
+	// Initialize cluster without CoreDNS - it will be installed after Calico CNI
+	// is ready so that CoreDNS pods get routable Calico IPs from the start.
 	c.logger.Infof("=== Initializing Kubernetes cluster on %s ===", nodeName)
 	c.logger.Info("")
 
-	if err := sshClient.ExecWithOutput(ctx, "sudo kubeadm init --config /etc/kubernetes/kubeadm-config.yaml"); err != nil {
+	if err := sshClient.ExecWithOutput(ctx, "sudo kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --skip-phases=addon/coredns"); err != nil {
 		return fmt.Errorf("kubeadm init failed: %w", err)
 	}
 
@@ -115,6 +116,20 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	}
 
 	c.logger.Info("CNI plugins will be installed to /opt/cni/bin (tmpfs overlay for bootc)")
+
+	// Wait for Calico to write its CNI config before installing CoreDNS
+	c.logger.Info("Waiting for Calico CNI configuration...")
+	if err := c.waitForCalicoCNI(ctx, sshClient); err != nil {
+		return fmt.Errorf("failed waiting for Calico CNI: %w", err)
+	}
+	c.logger.Info("✓ Calico CNI configuration ready")
+
+	// Now install CoreDNS - Calico CNI is ready so pods get routable IPs
+	c.logger.Info("")
+	c.logger.Info("=== Installing CoreDNS ===")
+	if err := sshClient.ExecWithOutput(ctx, "sudo kubeadm init phase addon coredns --config /etc/kubernetes/kubeadm-config.yaml"); err != nil {
+		return fmt.Errorf("failed to install CoreDNS: %w", err)
+	}
 
 	// Patch CoreDNS to run as root - CRI-O doesn't set ambient capabilities
 	// for non-root users, so NET_BIND_SERVICE doesn't take effect for UID 65532
@@ -149,6 +164,26 @@ func (c *Cluster) newKubeClient(ctx context.Context, sshClient *ssh.Client, cont
 
 	serverURL := fmt.Sprintf("https://localhost:%d", hostPort)
 	return kube.NewFromKubeconfig(ctx, []byte(kubeconfigContent), serverURL)
+}
+
+// waitForCalicoCNI polls the VM until Calico's CNI config file appears in /etc/cni/net.d.
+func (c *Cluster) waitForCalicoCNI(ctx context.Context, sshClient *ssh.Client) error {
+	deadline := time.After(2 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline:
+			return fmt.Errorf("timed out waiting for Calico CNI config in /etc/cni/net.d")
+		case <-ticker.C:
+			if _, err := sshClient.Exec(ctx, "test -f /etc/cni/net.d/10-calico.conflist"); err == nil {
+				return nil
+			}
+		}
+	}
 }
 
 // createKubeadmConfig creates the kubeadm config file in the container
