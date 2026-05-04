@@ -2,11 +2,14 @@ package integration_test
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
@@ -183,5 +186,137 @@ var _ = Describe("Multi-Node Clusters", func() {
 		Expect(listOutput).To(ContainSubstring(node1), "node list should contain node1")
 		Expect(listOutput).To(ContainSubstring(node2), "node list should contain node2")
 		Expect(listOutput).To(ContainSubstring(node3), "node list should contain node3")
+	})
+
+	It("should enable cross-node pod communication via services", func() {
+		By("Creating a two-node cluster")
+		helpers.CreateCluster(clusterName)
+
+		By("Adding worker node")
+		helpers.AddNode(clusterName, node2, "--role", "worker")
+
+		By("Exposing API and creating Kubernetes client")
+		kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
+		defer helpers.CleanupKubeconfig(kubeconfigPath)
+
+		By("Waiting for both nodes to be Ready")
+		helpers.WaitForNodeReady(kubeClient, node1, 5*time.Minute)
+		helpers.WaitForNodeReady(kubeClient, node2, 5*time.Minute)
+
+		By("Verifying CoreDNS pods have routable Calico IPs (not 10.85.x.x from CRI-O bridge CNI)")
+		Eventually(func() bool {
+			pods, err := kubeClient.CoreV1().Pods("kube-system").List(context.Background(), metav1.ListOptions{
+				LabelSelector: "k8s-app=kube-dns",
+			})
+			if err != nil || len(pods.Items) == 0 {
+				return false
+			}
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != corev1.PodRunning {
+					return false
+				}
+				if pod.Status.PodIP == "" || strings.HasPrefix(pod.Status.PodIP, "10.85.") {
+					return false
+				}
+			}
+			return true
+		}, 3*time.Minute, 10*time.Second).Should(BeTrue(),
+			"CoreDNS pods should have routable Calico IPs, not 10.85.x.x from CRI-O bridge CNI")
+
+		By("Removing control-plane taint from node1")
+		helpers.RemoveControlPlaneTaint(kubeClient, node1)
+
+		By("Deploying echo-server pod on node1")
+		serverPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "echo-server",
+				Labels: map[string]string{
+					"run": "echo-server",
+					"app": "echo-server",
+				},
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector: map[string]string{
+					"kubernetes.io/hostname": node1,
+				},
+				Containers: []corev1.Container{
+					{
+						Name:    "echo-server",
+						Image:   "busybox:latest",
+						Command: []string{"sh", "-c", "echo 'hello from echo-server' > /tmp/index.html && httpd -f -p 8080 -h /tmp"},
+						Ports: []corev1.ContainerPort{
+							{ContainerPort: 8080},
+						},
+					},
+				},
+			},
+		}
+		helpers.CreatePod(kubeClient, "default", serverPod, 3*time.Minute)
+
+		By("Creating echo-server service")
+		service := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "echo-server",
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					"app": "echo-server",
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Port:       8080,
+						TargetPort: intstr.FromInt32(8080),
+					},
+				},
+			},
+		}
+		helpers.CreateService(kubeClient, "default", service)
+
+		By("Deploying echo-client pod on node2")
+		clientPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "echo-client",
+				Labels: map[string]string{
+					"run": "echo-client",
+				},
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector: map[string]string{
+					"kubernetes.io/hostname": node2,
+				},
+				Containers: []corev1.Container{
+					{
+						Name:    "echo-client",
+						Image:   "busybox:latest",
+						Command: []string{"sleep", "3600"},
+					},
+				},
+			},
+		}
+		helpers.CreatePod(kubeClient, "default", clientPod, 3*time.Minute)
+
+		By("Verifying pods are scheduled on different nodes")
+		server, err := kubeClient.CoreV1().Pods("default").Get(context.Background(), "echo-server", metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		client, err := kubeClient.CoreV1().Pods("default").Get(context.Background(), "echo-client", metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(server.Spec.NodeName).To(Equal(node1), "echo-server should be on node1")
+		Expect(client.Spec.NodeName).To(Equal(node2), "echo-client should be on node2")
+
+		By("Testing cross-node pod communication via service")
+		Eventually(func() string {
+			result, _ := helpers.SSHExecQuiet(clusterName, node1,
+				"sudo kubectl exec echo-client --kubeconfig=/etc/kubernetes/admin.conf -- wget -qO- -T 5 http://echo-server.default.svc.cluster.local:8080")
+			return result
+		}, 2*time.Minute, 10*time.Second).Should(ContainSubstring("hello from echo-server"),
+			"echo-client on node2 should reach echo-server on node1 via service")
+
+		By("Verifying DNS resolution from a pod")
+		Eventually(func() string {
+			result, _ := helpers.SSHExecQuiet(clusterName, node1,
+				"sudo kubectl exec echo-client --kubeconfig=/etc/kubernetes/admin.conf -- nslookup kubernetes.default.svc.cluster.local")
+			return result
+		}, 2*time.Minute, 10*time.Second).Should(ContainSubstring("kubernetes.default.svc.cluster.local"),
+			"DNS resolution should work from a pod via CoreDNS")
 	})
 })

@@ -145,12 +145,8 @@ func ApplyDeployment(client *kubernetes.Clientset, namespace, manifest string) *
 	return created
 }
 
-// ApplyService parses a YAML string into a Service and creates it.
-func ApplyService(client *kubernetes.Clientset, namespace, manifest string) *corev1.Service {
-	service := &corev1.Service{}
-	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(manifest), 4096).Decode(service)
-	Expect(err).ToNot(HaveOccurred(), "Failed to parse service manifest")
-
+// CreateService creates a Service from a Go struct.
+func CreateService(client *kubernetes.Clientset, namespace string, service *corev1.Service) *corev1.Service {
 	created, err := client.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred(), "Failed to create service %s", service.Name)
 	return created
