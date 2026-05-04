@@ -70,7 +70,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		Logger:       logger,
 	})
 
-	if err := clusterMgr.EnsureImagesVolume(ctx); err != nil {
+	if err := clusterMgr.EnsureImagesVolume(ctx, nodeImage); err != nil {
 		return fmt.Errorf("ensuring images volume: %w", err)
 	}
 	logger.Info("")

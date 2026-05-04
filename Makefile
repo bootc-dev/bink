@@ -1,20 +1,17 @@
-.PHONY: all build-bink build-bink-container build-cluster-image build-populator-image clean rebuild help test-integration test-integration-quick update-calico
+.PHONY: all build-bink build-bink-container build-cluster-image clean rebuild help test-integration test-integration-quick update-calico
 
 # Extract image names and versions from internal/config/defaults.go (single source of truth)
 DEFAULTS_GO := internal/config/defaults.go
 extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
 
 CLUSTER_IMAGE := $(call extract,DefaultClusterImage )
-POPULATOR_IMAGE := $(call extract,DefaultPopulatorImage )
 FEDORA_VERSION := $(call extract,FedoraVersion )
-KUBE_MINOR := $(call extract,KubernetesMinorVersion )
 
 # Binary
 BINK_BINARY := bink
 
 # Directories
 VM_DIR := containerfiles/vm
-POPULATOR_DIR := containerfiles/populator
 
 all: build-cluster-image build-bink
 
@@ -40,16 +37,10 @@ build-cluster-image:
 	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
 
-# Build the populator image (skopeo pre-installed for fast volume population)
-build-populator-image:
-	@echo "=== Building cluster images populator ==="
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(POPULATOR_IMAGE) -f $(POPULATOR_DIR)/Containerfile $(POPULATOR_DIR)
-	@echo "✅ Populator image built: $(POPULATOR_IMAGE)"
-
-# Clean built images and disk
+# Clean built images
 clean:
 	@echo "=== Cleaning up ==="
-	podman rmi -f $(CLUSTER_IMAGE) $(POPULATOR_IMAGE) 2>/dev/null || true
+	podman rmi -f $(CLUSTER_IMAGE) 2>/dev/null || true
 	@echo "✅ Cleaned up images"
 
 # Rebuild everything from scratch
@@ -88,7 +79,6 @@ help:
 	@echo "  build-bink               - Build the bink CLI binary"
 	@echo "  build-bink-container     - Build the bink CLI binary in container (with C deps)"
 	@echo "  build-cluster-image      - Build the cluster container image"
-	@echo "  build-populator-image    - Build the cluster images populator image (skopeo)"
 	@echo ""
 	@echo "Clean Targets:"
 	@echo "  clean                    - Remove built images"
