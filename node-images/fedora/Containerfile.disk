@@ -21,6 +21,8 @@ RUN mkdir -p /output && \
     --disk-size ${DISK_SIZE} \
     ${BOOTC_IMAGE} \
     /output/fedora-bootc-k8s.qcow2
+RUN podman run --rm ${BOOTC_IMAGE} kubeadm config images list > /output/images.txt
 
 FROM scratch
 COPY --from=builder /output/fedora-bootc-k8s.qcow2 /fedora-bootc-k8s.qcow2
+COPY --from=builder /output/images.txt /images.txt
