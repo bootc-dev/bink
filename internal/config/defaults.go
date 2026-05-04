@@ -7,7 +7,7 @@ const (
 	FedoraVersion = "43"
 
 	DefaultClusterImage = "localhost/cluster:latest"
-	DefaultNodeImage    = "localhost/fedora-bootc-k8s-image:latest"
+	DefaultNodeImage    = "ghcr.io/bootc-dev/bink/node:v1.35-fedora-43"
 
 	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"
 	DefaultMemory   = 8192
