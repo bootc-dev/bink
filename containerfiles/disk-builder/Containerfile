@@ -1,0 +1,7 @@
+ARG CLUSTER_IMAGE=localhost/cluster:latest
+
+FROM ${CLUSTER_IMAGE}
+RUN dnf install -y podman bcvk binutils && dnf clean all
+RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_manager="cgroupfs"\n' \
+    > /etc/containers/containers.conf
+ENTRYPOINT []
