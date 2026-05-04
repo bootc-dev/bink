@@ -54,7 +54,7 @@ build-cluster-image:
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
 
 # Build container image with qcow2 disk (bcvk to-disk runs inside the build)
-build-images-container: build-vm-image build-cluster-image
+build-images-container: build-vm-image
 	@echo "=== Building node image with qcow2 disk ==="
 	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
 	podman build \
@@ -65,7 +65,7 @@ build-images-container: build-vm-image build-cluster-image
 		--device=/dev/kvm \
 		--volume "$$STORAGE_PATH:$$STORAGE_PATH" \
 		--build-arg STORAGE_PATH="$$STORAGE_PATH" \
-		--build-arg CLUSTER_IMAGE="$(CLUSTER_IMAGE)" \
+		--build-arg FEDORA_VERSION="$(FEDORA_VERSION)" \
 		--build-arg BOOTC_IMAGE="$(BOOTC_IMAGE)" \
 		--build-arg DISK_SIZE="$(DISK_SIZE)" \
 		--build-arg MEMORY="$(BUILD_MEMORY)" \

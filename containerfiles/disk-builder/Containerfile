@@ -1,7 +1,7 @@
-ARG CLUSTER_IMAGE=localhost/cluster:latest
+ARG FEDORA_VERSION=43
 
-FROM ${CLUSTER_IMAGE} AS builder
-RUN dnf install -y podman bcvk binutils && dnf clean all
+FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION} AS builder
+RUN dnf install -y --setopt=install_weak_deps=0 qemu-kvm podman bcvk binutils && dnf clean all
 RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_manager="cgroupfs"\n' \
     > /etc/containers/containers.conf
 
