@@ -113,6 +113,46 @@ func ContainerExists(name string) bool {
 	return GetContainer(name) != nil
 }
 
+// ImagePull pulls an image from a registry.
+func ImagePull(image string) {
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
+	_, err = podmanClient.ImagePull(ctx, image, false)
+	Expect(err).ToNot(HaveOccurred(), "Failed to pull image %s", image)
+}
+
+// ImageTag tags an image with a new name.
+func ImageTag(nameOrID, tag, repo string) {
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
+	err = podmanClient.ImageTag(ctx, nameOrID, tag, repo)
+	Expect(err).ToNot(HaveOccurred(), "Failed to tag image %s", nameOrID)
+}
+
+// ImagePush pushes an image to a registry with TLS verification disabled.
+func ImagePush(source, destination string) {
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	Expect(err).ToNot(HaveOccurred(), "Failed to create podman client")
+
+	err = podmanClient.ImagePush(ctx, source, destination, true)
+	Expect(err).ToNot(HaveOccurred(), "Failed to push image %s to %s", source, destination)
+}
+
+// ImageRemove removes images by name.
+func ImageRemove(names ...string) {
+	ctx := context.Background()
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		return
+	}
+	_ = podmanClient.ImageRemove(ctx, names, false)
+}
+
 // GetVolume checks if a volume exists
 func GetVolume(name string) bool {
 	ctx := context.Background()

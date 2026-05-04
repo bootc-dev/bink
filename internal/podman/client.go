@@ -649,6 +649,61 @@ func (c *Client) VolumeList(ctx context.Context, filter string) ([]string, error
 	return names, nil
 }
 
+func (c *Client) ImagePull(ctx context.Context, rawImage string, skipTLSVerify bool) ([]string, error) {
+	if err := c.ensureConnection(); err != nil {
+		return nil, err
+	}
+
+	opts := new(images.PullOptions).WithQuiet(true).WithSkipTLSVerify(skipTLSVerify)
+	pulled, err := images.Pull(c.conn, rawImage, opts)
+	if err != nil {
+		return nil, fmt.Errorf("pulling image %s: %w", rawImage, err)
+	}
+
+	return pulled, nil
+}
+
+func (c *Client) ImageTag(ctx context.Context, nameOrID, tag, repo string) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	if err := images.Tag(c.conn, nameOrID, tag, repo, nil); err != nil {
+		return fmt.Errorf("tagging image %s: %w", nameOrID, err)
+	}
+
+	return nil
+}
+
+func (c *Client) ImagePush(ctx context.Context, source, destination string, skipTLSVerify bool) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	opts := new(images.PushOptions).WithQuiet(true).WithSkipTLSVerify(skipTLSVerify)
+	if err := images.Push(c.conn, source, destination, opts); err != nil {
+		return fmt.Errorf("pushing image %s to %s: %w", source, destination, err)
+	}
+
+	return nil
+}
+
+func (c *Client) ImageRemove(ctx context.Context, names []string, force bool) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	opts := new(images.RemoveOptions).WithForce(force)
+	_, errs := images.Remove(c.conn, names, opts)
+	for _, err := range errs {
+		if err != nil {
+			return fmt.Errorf("removing images: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (c *Client) ImageExists(ctx context.Context, name string) (bool, error) {
 	if err := c.ensureConnection(); err != nil {
 		return false, err
