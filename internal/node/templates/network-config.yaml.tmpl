@@ -7,6 +7,9 @@ ethernets:
     dhcp6: false
     addresses:
       - {{.ClusterIP}}/24
+    routes:
+      - to: {{.ServiceCIDR}}
+        scope: link
     nameservers:
       search: [{{.ClusterDomain}}]
       addresses: [{{.Node1IP}}, {{.UpstreamDNS1}}]

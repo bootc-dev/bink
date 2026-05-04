@@ -16,7 +16,7 @@ write_files:
       volumePluginDir: /var/lib/kubelet/volumeplugins
   - path: /etc/sysconfig/kubelet
     content: |
-      KUBELET_EXTRA_ARGS=--volume-plugin-dir=/var/lib/kubelet/volumeplugins
+      KUBELET_EXTRA_ARGS=--volume-plugin-dir=/var/lib/kubelet/volumeplugins --node-ip={{.ClusterIP}}
   - path: /etc/containers/storage.conf
     content: |
       [storage]

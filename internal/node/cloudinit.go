@@ -35,6 +35,7 @@ type CloudInitData struct {
 	RegistryStaticIP string
 	RegistryPort     int
 	RegistryHostname string
+	ServiceCIDR      string
 }
 
 func (n *Node) newCloudInitData(sshPubKey string) CloudInitData {
@@ -51,6 +52,7 @@ func (n *Node) newCloudInitData(sshPubKey string) CloudInitData {
 		RegistryStaticIP: config.RegistryStaticIP,
 		RegistryPort:     config.RegistryPort,
 		RegistryHostname: config.RegistryHostname,
+		ServiceCIDR:      config.ServiceCIDR,
 	}
 }
 

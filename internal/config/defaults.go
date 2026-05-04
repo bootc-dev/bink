@@ -36,6 +36,7 @@ const (
 	ClusterMACPrefix   = "52:54:01"
 
 	DefaultAPIServerPort = 6443
+	ServiceCIDR          = "10.96.0.0/12"
 
 	KubernetesVersion      = "v1.35.0"
 	KubernetesMinorVersion = "1.35"
