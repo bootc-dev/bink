@@ -1,7 +1,26 @@
 ARG CLUSTER_IMAGE=localhost/cluster:latest
 
-FROM ${CLUSTER_IMAGE}
+FROM ${CLUSTER_IMAGE} AS builder
 RUN dnf install -y podman bcvk binutils && dnf clean all
 RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_manager="cgroupfs"\n' \
     > /etc/containers/containers.conf
-ENTRYPOINT []
+
+ARG STORAGE_PATH
+ARG BOOTC_IMAGE=localhost/fedora-bootc-k8s:latest
+ARG DISK_SIZE=10G
+ARG MEMORY=4G
+RUN mkdir -p /output && \
+    export CONTAINERS_STORAGE_CONF=/tmp/storage.conf && \
+    printf "[storage]\ndriver = \"overlay\"\ngraphroot = \"${STORAGE_PATH}\"\n" > $CONTAINERS_STORAGE_CONF && \
+    bcvk to-disk -K \
+    --karg 'console=tty0' \
+    --karg 'console=ttyS0,115200n8' \
+    --filesystem ext4 \
+    --format qcow2 \
+    --memory ${MEMORY} \
+    --disk-size ${DISK_SIZE} \
+    ${BOOTC_IMAGE} \
+    /output/fedora-bootc-k8s.qcow2
+
+FROM scratch
+COPY --from=builder /output/fedora-bootc-k8s.qcow2 /fedora-bootc-k8s.qcow2
