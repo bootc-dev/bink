@@ -36,6 +36,9 @@ build-disk-image: build-bootc-image
 	@echo ""
 	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
 
+print-IMAGE_TAG:
+	@echo v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
+
 clean:
 	@echo "=== Cleaning up ==="
 	podman rmi -f $(BOOTC_IMAGE) $(NODE_IMAGE) 2>/dev/null || true
