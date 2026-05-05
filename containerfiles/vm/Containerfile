@@ -16,6 +16,7 @@ RUN dnf install -y \
 	openssh-clients \
 	genisoimage \
 	&& dnf clean all
+RUN dnf install -y --setopt=install_weak_deps=0 podman && dnf clean all
 
 COPY qemu.conf /etc/libvirt/qemu.conf
 COPY virtqemud.conf /etc/libvirt/virtqemud.conf
@@ -24,4 +25,6 @@ COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /usr/local/bin/virtiofsd-wrapper
 RUN mkdir -p /home/qemu && chown -R qemu:qemu /home/qemu
+RUN echo 'root:100000:65536' > /etc/subuid && \
+    echo 'root:100000:65536' > /etc/subgid
 ENTRYPOINT ["/entrypoint.sh"]

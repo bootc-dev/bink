@@ -23,8 +23,7 @@ var calicoManifest []byte
 var kubeadmConfigTemplate = template.Must(template.New("kubeadm-config").Parse(kubeadmConfigTmpl))
 
 type kubeadmConfigParams struct {
-	AdvertiseAddress  string
-	KubernetesVersion string
+	AdvertiseAddress string
 }
 
 // InitOptions holds options for cluster initialization
@@ -190,8 +189,7 @@ func (c *Cluster) waitForCalicoCNI(ctx context.Context, sshClient *ssh.Client) e
 func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string, advertiseAddress string) error {
 	var buf bytes.Buffer
 	if err := kubeadmConfigTemplate.Execute(&buf, kubeadmConfigParams{
-		AdvertiseAddress:  advertiseAddress,
-		KubernetesVersion: config.KubernetesVersion,
+		AdvertiseAddress: advertiseAddress,
 	}); err != nil {
 		return fmt.Errorf("failed to render kubeadm config: %w", err)
 	}

@@ -16,7 +16,8 @@ import (
 
 var _ = Describe("Cluster Images Volume", Serial, func() {
 	BeforeEach(func() {
-		helpers.RequireImage(config.DefaultPopulatorImage)
+		helpers.RequireImage(config.DefaultClusterImage)
+		helpers.RequireImage(config.DefaultNodeImage)
 
 		ctx := context.Background()
 		podmanClient, err := podman.NewClient()
@@ -67,7 +68,7 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 
 		By("Populating the cluster-images volume via EnsureImagesVolume")
 		c := cluster.New(cluster.Config{Name: "test-images"})
-		err = c.EnsureImagesVolume(ctx)
+		err = c.EnsureImagesVolume(ctx, config.DefaultNodeImage)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Verifying volume was created")
@@ -77,17 +78,17 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 
 		By("Verifying volume is marked as completed")
 		err = podmanClient.ContainerRunQuiet(ctx,
-			config.DefaultPopulatorImage,
+			config.DefaultClusterImage,
 			[]string{"test", "-f", "/check/.completed"},
 			[]string{cluster.ClusterImagesVolume + ":/check:z"},
 		)
 		Expect(err).ToNot(HaveOccurred(), ".completed marker should exist in the volume")
 
-		By("Verifying images are stored in the volume")
+		By("Verifying Calico images are stored in the volume")
 		verifyContainer := "test-images-verify"
 		_, err = podmanClient.ContainerCreate(ctx, &podman.ContainerCreateOptions{
 			Name:    verifyContainer,
-			Image:   config.DefaultPopulatorImage,
+			Image:   config.DefaultClusterImage,
 			Command: []string{"sleep", "infinity"},
 			Volumes: []*specgen.NamedVolume{{
 				Name: cluster.ClusterImagesVolume,
@@ -97,15 +98,11 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
-			[]string{"skopeo", "inspect", "containers-storage:registry.k8s.io/kube-apiserver:" + config.KubernetesVersion})
-		Expect(err).ToNot(HaveOccurred(), "kube-apiserver image should exist in the volume")
-
-		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
-			[]string{"skopeo", "inspect", "containers-storage:" + config.CalicoImageBase + "/node:" + config.CalicoVersion})
+			[]string{"podman", "image", "exists", config.CalicoImageBase + "/node:" + config.CalicoVersion})
 		Expect(err).ToNot(HaveOccurred(), "calico/node image should exist in the volume")
 
 		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
-			[]string{"skopeo", "inspect", "containers-storage:" + config.CalicoImageBase + "/cni:" + config.CalicoVersion})
+			[]string{"podman", "image", "exists", config.CalicoImageBase + "/cni:" + config.CalicoVersion})
 		Expect(err).ToNot(HaveOccurred(), "calico/cni image should exist in the volume")
 	})
 })

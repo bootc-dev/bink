@@ -1,0 +1,65 @@
+name: Build and Push Node Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'node-images/fedora/**'
+  pull_request:
+    paths:
+      - 'node-images/fedora/**'
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'Push image to registry'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/node
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    container:
+      image: quay.io/fedora/fedora:43
+      options: --privileged --device /dev/kvm -v /var/lib/containers
+    steps:
+      - name: Install dependencies
+        run: dnf install -y --setopt=install_weak_deps=0 podman git make
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == 'true')
+        run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+
+      - name: Build bootc image
+        working-directory: node-images/fedora
+        run: make build-bootc-image
+
+      - name: Build disk image
+        working-directory: node-images/fedora
+        run: make build-disk-image
+
+      - name: Determine image tag
+        id: meta
+        working-directory: node-images/fedora
+        run: |
+          TAG=$(make -s print-IMAGE_TAG)
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${TAG}"
+
+      - name: Tag and push
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == 'true')
+        run: |
+          podman tag localhost/fedora-bootc-k8s-image:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          podman tag localhost/fedora-bootc-k8s-image:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

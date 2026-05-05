@@ -7,9 +7,7 @@ const (
 	FedoraVersion = "43"
 
 	DefaultClusterImage = "localhost/cluster:latest"
-	DefaultBootcImage   = "localhost/fedora-bootc-k8s:latest"
-	DefaultNodeImage    = "localhost/fedora-bootc-k8s-image:latest"
-	DefaultPopulatorImage   = "localhost/cluster-images-populator:latest"
+	DefaultNodeImage    = "ghcr.io/bootc-dev/bink/node:v1.35-fedora-43"
 
 	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"
 	DefaultMemory   = 8192
@@ -37,9 +35,6 @@ const (
 
 	DefaultAPIServerPort = 6443
 	ServiceCIDR          = "10.96.0.0/12"
-
-	KubernetesVersion      = "v1.35.0"
-	KubernetesMinorVersion = "1.35"
 
 	CalicoVersion    = "v3.27.0"
 	CalicoImageBase  = "quay.io/calico"

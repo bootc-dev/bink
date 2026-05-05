@@ -205,11 +205,15 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 	// Create spec generator
 	spec := specgen.NewSpecGenerator(opts.Image, false)
 	spec.Name = opts.Name
+	spec.Entrypoint = opts.Entrypoint
 	spec.Command = opts.Command
 	spec.Env = opts.Environment
 	spec.Labels = opts.Labels
 	spec.CapAdd = opts.CapAdd
 	spec.SelinuxOpts = opts.SelinuxOpts
+	if opts.Privileged {
+		spec.Privileged = &opts.Privileged
+	}
 	spec.Devices = opts.Devices
 	spec.Volumes = opts.Volumes
 	spec.Mounts = opts.Mounts
@@ -737,7 +741,10 @@ func (c *Client) ContainerRunQuiet(ctx context.Context, image string, cmd []stri
 	}
 
 	spec := specgen.NewSpecGenerator(image, false)
-	spec.Command = cmd
+	if len(cmd) > 0 {
+		spec.Entrypoint = cmd[:1]
+		spec.Command = cmd[1:]
+	}
 	remove := true
 	spec.Remove = &remove
 

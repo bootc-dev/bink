@@ -9,6 +9,7 @@ import (
 type ContainerCreateOptions struct {
 	Name           string
 	Image          string
+	Entrypoint     []string
 	Command        []string
 	Network        string
 	NetworkOptions map[string]nettypes.PerNetworkOptions
@@ -21,4 +22,5 @@ type ContainerCreateOptions struct {
 	Labels         map[string]string
 	CapAdd         []string
 	SelinuxOpts    []string
+	Privileged     bool
 }
