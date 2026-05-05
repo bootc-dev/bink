@@ -9,8 +9,8 @@ ARG STORAGE_PATH
 ARG BOOTC_IMAGE
 ARG DISK_SIZE=10G
 ARG MEMORY=4G
+ENV CONTAINERS_STORAGE_CONF=/tmp/storage.conf
 RUN mkdir -p /output && \
-    export CONTAINERS_STORAGE_CONF=/tmp/storage.conf && \
     printf "[storage]\ndriver = \"overlay\"\ngraphroot = \"${STORAGE_PATH}\"\n" > $CONTAINERS_STORAGE_CONF && \
     bcvk to-disk -K \
     --karg 'console=tty0' \
