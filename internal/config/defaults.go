@@ -7,7 +7,7 @@ const (
 	FedoraVersion = "43"
 
 	DefaultClusterImage = "localhost/cluster:latest"
-	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-43"
+	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-43-disk"
 
 	DefaultBaseDisk = "/images/disk.qcow2"
 	DefaultMemory   = 8192

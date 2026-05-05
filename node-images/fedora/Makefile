@@ -38,8 +38,8 @@ build-disk-image: build-bootc-image
 	@echo ""
 	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
 
-print-IMAGE_TAG:
-	@echo v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
+print-image-tag:
+	@echo $(IMAGE_TAG)
 
 clean:
 	@echo "=== Cleaning up ==="
