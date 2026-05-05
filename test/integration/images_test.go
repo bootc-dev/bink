@@ -98,11 +98,11 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
-			[]string{"skopeo", "inspect", "containers-storage:" + config.CalicoImageBase + "/node:" + config.CalicoVersion})
+			[]string{"podman", "image", "exists", config.CalicoImageBase + "/node:" + config.CalicoVersion})
 		Expect(err).ToNot(HaveOccurred(), "calico/node image should exist in the volume")
 
 		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
-			[]string{"skopeo", "inspect", "containers-storage:" + config.CalicoImageBase + "/cni:" + config.CalicoVersion})
+			[]string{"podman", "image", "exists", config.CalicoImageBase + "/cni:" + config.CalicoVersion})
 		Expect(err).ToNot(HaveOccurred(), "calico/cni image should exist in the volume")
 	})
 })

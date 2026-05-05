@@ -211,7 +211,9 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 	spec.Labels = opts.Labels
 	spec.CapAdd = opts.CapAdd
 	spec.SelinuxOpts = opts.SelinuxOpts
-	spec.Privileged = &opts.Privileged
+	if opts.Privileged {
+		spec.Privileged = &opts.Privileged
+	}
 	spec.Devices = opts.Devices
 	spec.Volumes = opts.Volumes
 	spec.Mounts = opts.Mounts

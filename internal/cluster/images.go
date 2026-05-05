@@ -107,7 +107,8 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 			Source:      nodeImage,
 			Destination: "/images",
 		}},
-		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
+		Volumes:    []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
+		Privileged: true,
 	}
 
 	_, err := c.podmanClient.ContainerCreate(ctx, opts)
@@ -145,7 +146,7 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 
 	logrus.Infof("Found %d images to pull", len(images))
 
-	// Pull each image using skopeo with a per-image timeout
+	// Pull each image using podman with a per-image timeout
 	pullTimeout := time.Duration(config.DefaultImagePullTimeout) * time.Second
 	maxRetries := 2
 	failCount := 0
@@ -160,7 +161,7 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 
 			pullCtx, cancel := context.WithTimeout(ctx, pullTimeout)
 			lastErr = c.podmanClient.ContainerExecQuiet(pullCtx, tmpContainer,
-				[]string{"skopeo", "copy", "docker://" + image, "containers-storage:" + image})
+				[]string{"podman", "pull", "--quiet", image})
 			cancel()
 
 			if lastErr == nil {
