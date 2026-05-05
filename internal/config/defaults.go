@@ -9,7 +9,7 @@ const (
 	DefaultClusterImage = "localhost/cluster:latest"
 	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-43"
 
-	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"
+	DefaultBaseDisk = "/images/disk.qcow2"
 	DefaultMemory   = 8192
 	DefaultVCPUs       = 4
 	DefaultDiskSize    = "10G"
