@@ -28,9 +28,7 @@ The resulting `./bink` binary is placed in the workspace root.
 ### Building Container Images (needed before first cluster)
 
 ```bash
-make build-vm-image           # Build fedora-bootc-k8s VM image
 make build-cluster-image      # Build the cluster container image (libvirt + qemu)
-make build-disk               # Convert bootc image to qcow2 (requires bcvk tool)
 make build-images-container   # Wrap qcow2 in a container for image-volume mounting
 ```
 
@@ -234,7 +232,7 @@ Host (podman)
 |------|---------|
 | `/var/run/cluster/cluster.key` | SSH private key (shared volume) |
 | `/var/run/cluster/cluster.key.pub` | SSH public key |
-| `/images/fedora-bootc-k8s.qcow2` | Base VM disk (from images volume) |
+| `/images/disk.qcow2` | Base VM disk (from images volume) |
 | `/var/lib/cluster-images/` | Shared filesystem (virtiofs, read-only) |
 
 ### Key Paths Inside VMs
