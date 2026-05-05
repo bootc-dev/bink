@@ -6,7 +6,7 @@ RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_man
     > /etc/containers/containers.conf
 
 ARG STORAGE_PATH
-ARG BOOTC_IMAGE=localhost/fedora-bootc-k8s:latest
+ARG BOOTC_IMAGE
 ARG DISK_SIZE=10G
 ARG MEMORY=4G
 RUN mkdir -p /output && \
