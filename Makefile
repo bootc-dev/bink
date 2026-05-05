@@ -1,4 +1,4 @@
-.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-disk build-images-container build-populator-image clean clean-disk rebuild help test-integration test-integration-quick update-calico
+.PHONY: all build-bink build-bink-container build-vm-image build-cluster-image build-images-container build-populator-image clean rebuild help test-integration test-integration-quick update-calico
 
 # Extract image names and versions from internal/config/defaults.go (single source of truth)
 DEFAULTS_GO := internal/config/defaults.go
@@ -12,6 +12,7 @@ FEDORA_VERSION := $(call extract,FedoraVersion )
 KUBE_MINOR := $(call extract,KubernetesMinorVersion )
 DISK_IMAGE := fedora-bootc-k8s.qcow2
 DISK_SIZE := 10G
+BUILD_MEMORY := 4G
 
 # Binary
 BINK_BINARY := bink
@@ -20,9 +21,9 @@ BINK_BINARY := bink
 IMAGES_DIR := containerfiles/images
 VM_DIR := containerfiles/vm
 POPULATOR_DIR := containerfiles/populator
-OUTPUT_DIR := vm/images
+DISK_BUILDER_DIR := containerfiles/disk-builder
 
-all: build-cluster-image build-vm-image build-disk build-images-container build-bink
+all: build-cluster-image build-vm-image build-images-container build-bink
 
 # Build the bink CLI binary
 build-bink:
@@ -52,17 +53,25 @@ build-cluster-image:
 	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
 
-# Convert bootc image to qcow2 disk (runs bcvk inside a privileged container)
-build-disk: build-vm-image build-cluster-image
-	./hack/build-disk.sh
-
-# Build container image with qcow2 disk for image volume mounting
-build-images-container: build-disk
+# Build container image with qcow2 disk (bcvk to-disk runs inside the build)
+build-images-container: build-vm-image
 	@echo "=== Building node image with qcow2 disk ==="
-	@echo "FROM scratch" > $(OUTPUT_DIR)/Containerfile.images
-	@echo "COPY $(DISK_IMAGE) /$(DISK_IMAGE)" >> $(OUTPUT_DIR)/Containerfile.images
-	podman build -t $(NODE_IMAGE) -f $(OUTPUT_DIR)/Containerfile.images $(OUTPUT_DIR)
-	@rm -f $(OUTPUT_DIR)/Containerfile.images
+	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
+	podman build \
+		--cap-add=SYS_ADMIN \
+		--cap-add=DAC_READ_SEARCH \
+		--cap-add=MKNOD \
+		--security-opt=label=disable \
+		--device=/dev/kvm \
+		--volume "$$STORAGE_PATH:$$STORAGE_PATH" \
+		--build-arg STORAGE_PATH="$$STORAGE_PATH" \
+		--build-arg FEDORA_VERSION="$(FEDORA_VERSION)" \
+		--build-arg BOOTC_IMAGE="$(BOOTC_IMAGE)" \
+		--build-arg DISK_SIZE="$(DISK_SIZE)" \
+		--build-arg MEMORY="$(BUILD_MEMORY)" \
+		-t $(NODE_IMAGE) \
+		-f $(DISK_BUILDER_DIR)/Containerfile \
+		$(DISK_BUILDER_DIR)
 	@echo "✅ Node image built: $(NODE_IMAGE)"
 	@echo ""
 	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
@@ -77,14 +86,7 @@ build-populator-image:
 clean:
 	@echo "=== Cleaning up ==="
 	podman rmi -f $(BOOTC_IMAGE) $(CLUSTER_IMAGE) $(NODE_IMAGE) $(POPULATOR_IMAGE) 2>/dev/null || true
-	rm -f $(OUTPUT_DIR)/$(DISK_IMAGE)
-	@echo "✅ Cleaned up images and disk"
-
-# Clean disk image only
-clean-disk:
-	@echo "=== Cleaning disk image ==="
-	rm -f $(OUTPUT_DIR)/$(DISK_IMAGE)
-	@echo "✅ Disk image removed"
+	@echo "✅ Cleaned up images"
 
 # Rebuild everything from scratch
 rebuild: clean all
@@ -123,13 +125,11 @@ help:
 	@echo "  build-bink-container     - Build the bink CLI binary in container (with C deps)"
 	@echo "  build-vm-image           - Build the fedora-bootc-k8s VM container image"
 	@echo "  build-cluster-image      - Build the cluster container image"
-	@echo "  build-disk               - Convert bootc image to qcow2 disk image"
-	@echo "  build-images-container   - Build container with qcow2 disk for image volume"
+	@echo "  build-images-container   - Build container with qcow2 disk (runs bcvk to-disk in build)"
 	@echo "  build-populator-image    - Build the cluster images populator image (skopeo)"
 	@echo ""
 	@echo "Clean Targets:"
-	@echo "  clean                    - Remove all built images and disk"
-	@echo "  clean-disk               - Remove only the disk image"
+	@echo "  clean                    - Remove all built images"
 	@echo "  rebuild                  - Clean and rebuild everything"
 	@echo ""
 	@echo "Maintenance Targets:"
@@ -144,4 +144,3 @@ help:
 	@echo "  VM image:       $(BOOTC_IMAGE)"
 	@echo "  Cluster image:  $(CLUSTER_IMAGE)"
 	@echo "  Node image:     $(NODE_IMAGE)"
-	@echo "  Disk image:     $(OUTPUT_DIR)/$(DISK_IMAGE)"
