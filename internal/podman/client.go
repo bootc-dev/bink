@@ -653,6 +653,22 @@ func (c *Client) VolumeList(ctx context.Context, filter string) ([]string, error
 	return names, nil
 }
 
+func (c *Client) EnsureImage(ctx context.Context, image string) error {
+	exists, err := c.ImageExists(ctx, image)
+	if err != nil {
+		return fmt.Errorf("checking image %s: %w", image, err)
+	}
+	if exists {
+		return nil
+	}
+
+	logrus.Infof("Pulling image %s", image)
+	if _, err := c.ImagePull(ctx, image, false); err != nil {
+		return fmt.Errorf("pulling image %s: %w", image, err)
+	}
+	return nil
+}
+
 func (c *Client) ImagePull(ctx context.Context, rawImage string, skipTLSVerify bool) ([]string, error) {
 	if err := c.ensureConnection(); err != nil {
 		return nil, err
