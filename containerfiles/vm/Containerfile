@@ -21,10 +21,18 @@ RUN dnf install -y --setopt=install_weak_deps=0 podman && dnf clean all
 COPY qemu.conf /etc/libvirt/qemu.conf
 COPY virtqemud.conf /etc/libvirt/virtqemud.conf
 COPY virtiofsd-wrapper /usr/local/bin/virtiofsd-wrapper
-COPY entrypoint.sh /entrypoint.sh
+COPY virtiofsd.service /etc/systemd/system/virtiofsd.service
+
+RUN mkdir -p /etc/systemd/system/virtqemud.service.d
+COPY virtqemud-override.conf /etc/systemd/system/virtqemud.service.d/override.conf
 
 RUN chmod +x /usr/local/bin/virtiofsd-wrapper
 RUN mkdir -p /home/qemu && chown -R qemu:qemu /home/qemu
 RUN echo 'root:100000:65536' > /etc/subuid && \
     echo 'root:100000:65536' > /etc/subgid
-ENTRYPOINT ["/entrypoint.sh"]
+RUN systemctl enable virtqemud.service virtlogd.service virtstoraged.service \
+    virtnetworkd.service virtiofsd.service && \
+    systemctl mask systemd-logind.service getty.target console-getty.service
+
+STOPSIGNAL SIGRTMIN+3
+ENTRYPOINT ["/sbin/init"]
