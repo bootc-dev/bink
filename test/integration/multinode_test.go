@@ -71,7 +71,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 		_ = hasWorkerRole
 
 		By("Verifying DNS entry for node2")
-		hostsFile := helpers.SSHExec(clusterName, node1, "cat /var/lib/dnsmasq/cluster-hosts")
+		hostsFile := helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
 		Expect(hostsFile).To(ContainSubstring(node2), "cluster-hosts should contain node2")
 
 		By("Running node list and verifying both nodes appear")
@@ -109,7 +109,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 		}
 
 		By("Verifying DNS entries for all nodes")
-		hostsFile = helpers.SSHExec(clusterName, node1, "cat /var/lib/dnsmasq/cluster-hosts")
+		hostsFile = helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
 		Expect(hostsFile).To(ContainSubstring(node1), "cluster-hosts should contain node1")
 		Expect(hostsFile).To(ContainSubstring(node2), "cluster-hosts should contain node2")
 		Expect(hostsFile).To(ContainSubstring(node3), "cluster-hosts should contain node3")

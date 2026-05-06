@@ -141,9 +141,6 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 
 	c.logger.Info("")
 	c.logger.Infof("✅ Cluster initialized on %s with Calico CNI", nodeName)
-	c.logger.Info("")
-	c.logger.Info("✅ Cluster DNS server already configured via cloud-init")
-	c.logger.Infof("   Node %s will serve DNS on %s:53", nodeName, clusterIP)
 
 	return nil
 }
