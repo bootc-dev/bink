@@ -1,0 +1,12 @@
+FROM registry.fedoraproject.org/fedora-minimal
+
+RUN microdnf install -y dnsmasq && microdnf clean all
+
+RUN mkdir -p /var/lib/dnsmasq /etc/dnsmasq.d
+
+COPY cluster.conf /etc/dnsmasq.d/cluster.conf
+COPY cluster-hosts /var/lib/dnsmasq/cluster-hosts
+
+EXPOSE 53/udp 53/tcp
+
+CMD ["dnsmasq", "--no-daemon", "--log-facility=-"]
