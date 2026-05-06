@@ -40,6 +40,10 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 
 	logrus.Info("Creating registry container")
 
+	if err := m.podman.EnsureImage(ctx, config.RegistryImage); err != nil {
+		return fmt.Errorf("ensuring registry image: %w", err)
+	}
+
 	if err := m.podman.VolumeCreate(ctx, config.RegistryVolume); err != nil {
 		return fmt.Errorf("creating registry volume: %w", err)
 	}

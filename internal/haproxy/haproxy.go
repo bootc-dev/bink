@@ -162,6 +162,10 @@ func (m *Manager) createContainer(ctx context.Context, apiPort int) error {
 			config.HAProxyConfigPath, cfg, config.HAProxyConfigPath),
 	}
 
+	if err := m.podman.EnsureImage(ctx, config.HAProxyImage); err != nil {
+		return fmt.Errorf("ensuring HAProxy image: %w", err)
+	}
+
 	opts := &podman.ContainerCreateOptions{
 		Name:    name,
 		Image:   config.HAProxyImage,
