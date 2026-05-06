@@ -66,31 +66,6 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
-{{- if .IsNode1}}
-  - path: /etc/dnsmasq.d/cluster.conf
-    content: |
-      listen-address={{.ClusterIP}}
-      bind-interfaces
-      no-hosts
-      addn-hosts=/var/lib/dnsmasq/cluster-hosts
-      domain={{.ClusterDomain}}
-      domain-needed
-      bogus-priv
-      server={{.UpstreamDNS1}}
-      server={{.UpstreamDNS2}}
-      cache-size=1000
-  - path: /var/lib/dnsmasq/cluster-hosts
-    owner: dnsmasq:dnsmasq
-    permissions: '0644'
-    content: |
-      {{.ClusterIP}} {{.NodeName}} {{.NodeName}}.{{.ClusterDomain}}
-      {{.RegistryStaticIP}} {{.RegistryHostname}} {{.RegistryHostname}}.{{.ClusterDomain}}
-  - path: /etc/systemd/system/dnsmasq.service.d/wait-for-network.conf
-    content: |
-      [Unit]
-      After=network-online.target
-      Wants=network-online.target
-{{- end}}
 
 runcmd:
   - swapoff -a
@@ -106,23 +81,7 @@ runcmd:
   - systemctl enable --now var-mnt-cluster_images.mount
   - systemctl enable --now ostree-state-overlay@opt.service
   - systemctl enable --now qemu-guest-agent
-  - nmcli connection modify "cloud-init enp3s0" ipv4.dns-search "~{{.ClusterDomain}} {{.ClusterDomain}}"
-  - nmcli connection up "cloud-init enp3s0"
-{{- if .IsNode1}}
-  - chown dnsmasq:dnsmasq /var/lib/dnsmasq/cluster-hosts
-  - restorecon -v /var/lib/dnsmasq/cluster-hosts || true
-  - systemctl daemon-reload
-  - |
-    # Wait for enp3s0 to be up before starting dnsmasq
-    for i in {1..30}; do
-      if ip link show enp3s0 | grep -q "state UP"; then
-        echo "enp3s0 is up"
-        break
-      fi
-      echo "Waiting for enp3s0... ($i/30)"
-      sleep 1
-    done
-  - systemctl enable --now dnsmasq
-{{- end}}
+  - nmcli connection modify "cloud-init enp2s0" ipv4.dns-search "~{{.ClusterDomain}} {{.ClusterDomain}}"
+  - nmcli connection up "cloud-init enp2s0"
   - systemctl enable --now crio
   - systemctl enable kubelet

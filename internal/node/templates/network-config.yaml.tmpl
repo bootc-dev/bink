@@ -2,6 +2,9 @@ version: 2
 ethernets:
   enp2s0:
     dhcp4: true
+    nameservers:
+      search: [{{.ClusterDomain}}]
+      addresses: [{{.DNSIP}}]
   enp3s0:
     dhcp4: false
     dhcp6: false
@@ -10,7 +13,4 @@ ethernets:
     routes:
       - to: {{.ServiceCIDR}}
         scope: link
-    nameservers:
-      search: [{{.ClusterDomain}}]
-      addresses: [{{.Node1IP}}, {{.UpstreamDNS1}}]
     optional: true

@@ -25,8 +25,7 @@ var cloudInitTemplates = template.Must(
 type CloudInitData struct {
 	NodeName         string
 	ClusterIP        string
-	Node1IP          string
-	IsNode1          bool
+	DNSIP            string
 	SSHUser          string
 	SSHPubKey        string
 	ClusterDomain    string
@@ -42,8 +41,7 @@ func (n *Node) newCloudInitData(sshPubKey string) CloudInitData {
 	return CloudInitData{
 		NodeName:         n.Name,
 		ClusterIP:        n.ClusterIP,
-		Node1IP:          CalculateClusterIP(n.ClusterName, "node1"),
-		IsNode1:          n.Name == "node1",
+		DNSIP:            n.DNSIP,
 		SSHUser:          config.DefaultSSHUser,
 		SSHPubKey:        strings.TrimSpace(sshPubKey),
 		ClusterDomain:    config.ClusterDomain,
