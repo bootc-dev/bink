@@ -60,11 +60,14 @@ update-calico:
 
 # Test targets
 GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
+TEST_PROCS ?= 2
+GINKGO_FOCUS ?=
+GINKGO_FOCUS_FLAG := $(if $(GINKGO_FOCUS),--focus="$(GINKGO_FOCUS)",)
 
 test-integration:
 	@test -f ./$(BINK_BINARY) || (echo "Error: bink binary not found. Run 'make build-bink' first" && exit 1)
 	@echo "=== Running Integration Tests ==="
-	$(GINKGO) -v --procs=2 --randomize-all --randomize-suites test/integration/
+	$(GINKGO) -v --procs=$(TEST_PROCS) $(GINKGO_FOCUS_FLAG) --randomize-all --randomize-suites test/integration/
 
 test-integration-quick:
 	@test -f ./$(BINK_BINARY) || (echo "Error: bink binary not found. Run 'make build-bink' first" && exit 1)
