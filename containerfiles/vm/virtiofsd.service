@@ -1,0 +1,17 @@
+[Unit]
+Description=virtiofsd for cluster shared images
+Before=virtqemud.service
+
+[Service]
+Type=simple
+ExecStartPre=+/bin/bash -c 'mkdir -p /var/lib/libvirt/virtiofsd && chown qemu:qemu /var/lib/libvirt/virtiofsd /var/lib/cluster-images'
+User=qemu
+ExecStart=/usr/libexec/virtiofsd \
+    --socket-path=/var/lib/libvirt/virtiofsd/virtiofsd.sock \
+    --shared-dir=/var/lib/cluster-images \
+    --sandbox=none \
+    --cache=auto
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
