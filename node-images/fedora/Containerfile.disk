@@ -6,11 +6,11 @@ RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_man
     > /etc/containers/containers.conf
 
 ARG STORAGE_PATH
-ARG BOOTC_IMAGE=localhost/fedora-bootc-k8s:latest
+ARG BOOTC_IMAGE
 ARG DISK_SIZE=10G
 ARG MEMORY=4G
+ENV CONTAINERS_STORAGE_CONF=/tmp/storage.conf
 RUN mkdir -p /output && \
-    export CONTAINERS_STORAGE_CONF=/tmp/storage.conf && \
     printf "[storage]\ndriver = \"overlay\"\ngraphroot = \"${STORAGE_PATH}\"\n" > $CONTAINERS_STORAGE_CONF && \
     bcvk to-disk -K \
     --karg 'console=tty0' \
@@ -20,9 +20,9 @@ RUN mkdir -p /output && \
     --memory ${MEMORY} \
     --disk-size ${DISK_SIZE} \
     ${BOOTC_IMAGE} \
-    /output/fedora-bootc-k8s.qcow2
+    /output/disk.qcow2
 RUN podman run --rm ${BOOTC_IMAGE} kubeadm config images list > /output/images.txt
 
 FROM scratch
-COPY --from=builder /output/fedora-bootc-k8s.qcow2 /fedora-bootc-k8s.qcow2
+COPY --from=builder /output/disk.qcow2 /disk.qcow2
 COPY --from=builder /output/images.txt /images.txt

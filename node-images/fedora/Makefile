@@ -1,15 +1,17 @@
 .PHONY: build-bootc-image build-disk-image clean help
 
-BOOTC_IMAGE ?= localhost/fedora-bootc-k8s:latest
-NODE_IMAGE ?= localhost/fedora-bootc-k8s-image:latest
 KUBE_MINOR ?= 1.35
 FEDORA_VERSION ?= 43
 DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G
 
-# Build the fedora-bootc-k8s OCI bootc image (k8s + cri-o)
+IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
+BOOTC_IMAGE ?= localhost/bink-node:$(IMAGE_TAG)
+NODE_IMAGE ?= localhost/bink-node:$(IMAGE_TAG)-disk
+
+# Build the OCI bootc image (k8s + cri-o)
 build-bootc-image:
-	@echo "=== Building fedora-bootc-k8s bootc image ==="
+	@echo "=== Building bootc image ==="
 	podman build --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(BOOTC_IMAGE) -f Containerfile .
 	@echo "✅ Bootc image built: $(BOOTC_IMAGE)"
 
@@ -36,8 +38,8 @@ build-disk-image: build-bootc-image
 	@echo ""
 	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
 
-print-IMAGE_TAG:
-	@echo v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
+print-image-tag:
+	@echo $(IMAGE_TAG)
 
 clean:
 	@echo "=== Cleaning up ==="
@@ -48,8 +50,8 @@ help:
 	@echo "Makefile for building bink node images (Fedora)"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build-bootc-image - Build the fedora-bootc-k8s OCI bootc image"
-	@echo "  build-disk-image  - Build the disk image with qcow2 (default)"
+	@echo "  build-bootc-image - Build the OCI bootc image"
+	@echo "  build-disk-image  - Build the OCI disk image with qcow2 (default)"
 	@echo "  clean             - Remove built images"
 	@echo ""
 	@echo "Variables:"

@@ -7,12 +7,12 @@ const (
 	FedoraVersion = "43"
 
 	DefaultClusterImage = "localhost/cluster:latest"
-	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-43"
+	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-43-disk"
 
-	DefaultBaseDisk = "/images/fedora-bootc-k8s.qcow2"
+	DefaultBaseDisk = "/images/disk.qcow2"
 	DefaultMemory   = 8192
-	DefaultVCPUs       = 4
-	DefaultDiskSize    = "10G"
+	DefaultVCPUs    = 4
+	DefaultDiskSize = "10G"
 
 	DefaultSSHPort      = 2222
 	DefaultSSHUser      = "core"
@@ -36,19 +36,19 @@ const (
 	DefaultAPIServerPort = 6443
 	ServiceCIDR          = "10.96.0.0/12"
 
-	CalicoVersion    = "v3.27.0"
-	CalicoImageBase  = "quay.io/calico"
-	DefaultCNIManifest = "https://raw.githubusercontent.com/projectcalico/calico/" + CalicoVersion + "/manifests/calico.yaml"
+	CalicoVersion        = "v3.27.0"
+	CalicoImageBase      = "quay.io/calico"
+	DefaultCNIManifest   = "https://raw.githubusercontent.com/projectcalico/calico/" + CalicoVersion + "/manifests/calico.yaml"
 	DefaultKubeconfigDir = "."
 
 	ContainerNamePrefix = "k8s-"
 
-	DefaultDNSServer  = "node1"
-	DNSMasqHostsFile  = "/var/lib/dnsmasq/cluster-hosts"
-	DNSMasqConfigDir  = "/etc/dnsmasq.d"
-	ClusterDomain     = "cluster.local"
-	UpstreamDNS1      = "8.8.8.8"
-	UpstreamDNS2      = "8.8.4.4"
+	DefaultDNSServer = "node1"
+	DNSMasqHostsFile = "/var/lib/dnsmasq/cluster-hosts"
+	DNSMasqConfigDir = "/etc/dnsmasq.d"
+	ClusterDomain    = "cluster.local"
+	UpstreamDNS1     = "8.8.8.8"
+	UpstreamDNS2     = "8.8.4.4"
 
 	RegistryContainerName = "bink-registry"
 	RegistryImage         = "docker.io/library/registry:2"
