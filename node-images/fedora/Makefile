@@ -12,7 +12,14 @@ NODE_IMAGE ?= localhost/bink-node:$(IMAGE_TAG)-disk
 # Build the OCI bootc image (k8s + cri-o)
 build-bootc-image:
 	@echo "=== Building bootc image ==="
-	podman build --build-arg KUBE_MINOR=$(KUBE_MINOR) -t $(BOOTC_IMAGE) -f Containerfile .
+	podman build \
+		--cap-add=all \
+		--security-opt=label=disable \
+		--device /dev/fuse \
+		--build-arg KUBE_MINOR=$(KUBE_MINOR) \
+		-t $(BOOTC_IMAGE) \
+		-f Containerfile \
+		.
 	@echo "✅ Bootc image built: $(BOOTC_IMAGE)"
 
 # Build the disk image (qcow2 in a scratch container, for use as a podman image volume)
