@@ -43,7 +43,8 @@ const (
 
 	ContainerNamePrefix = "k8s-"
 
-	DefaultDNSServer = "node1"
+	DNSContainerName = "dns"
+	DNSImage         = "localhost/bink-dns:latest"
 	DNSMasqHostsFile = "/var/lib/dnsmasq/cluster-hosts"
 	DNSMasqConfigDir = "/etc/dnsmasq.d"
 	ClusterDomain    = "cluster.local"
