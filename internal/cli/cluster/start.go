@@ -9,6 +9,7 @@ import (
 	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/node"
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/registry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -77,6 +78,14 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 
 	logger.Info("Step 4: Creating control plane node (node1)...")
 	logger.Infof("Node image: %s", nodeImage)
+
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		return fmt.Errorf("creating podman client: %w", err)
+	}
+	if err := podmanClient.EnsureImage(ctx, nodeImage); err != nil {
+		return fmt.Errorf("ensuring node image: %w", err)
+	}
 
 	// Convert 0 to -1 for auto-assign (to distinguish from unset)
 	if apiPort == 0 {

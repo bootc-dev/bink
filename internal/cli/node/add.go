@@ -13,6 +13,7 @@ import (
 	"github.com/bootc-dev/bink/internal/dns"
 	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/node"
+	"github.com/bootc-dev/bink/internal/podman"
 )
 
 func newAddCmd() *cobra.Command {
@@ -58,6 +59,14 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	// Step 1: Create the new node
 	logger.Infof("Step 1: Creating %s node...", role)
 	logger.Infof("Node image: %s", nodeImage)
+
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		return fmt.Errorf("creating podman client: %w", err)
+	}
+	if err := podmanClient.EnsureImage(ctx, nodeImage); err != nil {
+		return fmt.Errorf("ensuring node image: %w", err)
+	}
 
 	clusterName := viper.GetString("cluster.name")
 
