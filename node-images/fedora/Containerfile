@@ -9,6 +9,7 @@ RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --install openssh-clients \
     --install kubernetes \
     --install kubernetes${KUBE_MINOR}-kubeadm \
+    --install kubernetes${KUBE_MINOR}-client \
     --install cri-o${KUBE_MINOR} \
     --install qemu-guest-agent \
     --install bind-utils \
