@@ -14,6 +14,7 @@ type JoinOptions struct {
 	NodeName       string
 	ControlPlane   string
 	IsControlPlane bool
+	NodeClusterIP  string
 	Timeout        time.Duration
 }
 
@@ -65,9 +66,8 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 
 	// For control-plane joins, set the advertise address to the node's cluster IP
 	// so the API server binds to the cluster network interface
-	if opts.IsControlPlane {
-		nodeClusterIP := c.GetNodeClusterIP(nodeName)
-		joinCommand = fmt.Sprintf("%s --apiserver-advertise-address %s", joinCommand, nodeClusterIP)
+	if opts.IsControlPlane && opts.NodeClusterIP != "" {
+		joinCommand = fmt.Sprintf("%s --apiserver-advertise-address %s", joinCommand, opts.NodeClusterIP)
 	}
 
 	// Execute join command

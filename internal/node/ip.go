@@ -8,9 +8,30 @@ import (
 )
 
 func CalculateClusterIP(clusterName, nodeName string) string {
+	return CalculateClusterIPExcluding(clusterName, nodeName, nil)
+}
+
+func CalculateClusterIPExcluding(clusterName, nodeName string, usedIPs []string) string {
 	hash := md5.Sum([]byte(clusterName + "/" + nodeName))
 	suffix := int(hash[0])%config.ClusterIPRangeSize + config.ClusterIPMinSuffix
-	return fmt.Sprintf("%s.%d", config.ClusterIPPrefix, suffix)
+	ip := fmt.Sprintf("%s.%d", config.ClusterIPPrefix, suffix)
+
+	for i := 0; i < config.ClusterIPRangeSize; i++ {
+		taken := false
+		for _, used := range usedIPs {
+			if used == ip {
+				taken = true
+				break
+			}
+		}
+		if !taken {
+			return ip
+		}
+		suffix = (suffix-config.ClusterIPMinSuffix+1)%config.ClusterIPRangeSize + config.ClusterIPMinSuffix
+		ip = fmt.Sprintf("%s.%d", config.ClusterIPPrefix, suffix)
+	}
+
+	return ip
 }
 
 func CalculateClusterMAC(clusterName, nodeName string) string {

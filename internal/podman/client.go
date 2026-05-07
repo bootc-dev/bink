@@ -516,6 +516,11 @@ func (c *Client) ContainerInspect(ctx context.Context, name, format string) (str
 			return name, nil
 		}
 		return "", nil
+	case "{{index .Config.Labels \"bink.cluster-ip\"}}":
+		if ip, ok := data.Config.Labels["bink.cluster-ip"]; ok {
+			return ip, nil
+		}
+		return "", nil
 	default:
 		return "", fmt.Errorf("unsupported format string: %s", format)
 	}

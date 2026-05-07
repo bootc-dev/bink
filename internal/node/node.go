@@ -23,6 +23,7 @@ type Node struct {
 	APIPort         int // Configured API port (0 = auto-assign)
 	AssignedAPIPort int // Actual assigned port after container creation
 
+	usedIPs      []string
 	podman       *podman.Client
 	virsh        *virsh.Client
 }
@@ -53,6 +54,13 @@ func WithAPIPort(port int) NodeOption {
 func WithMemory(memory int) NodeOption {
 	return func(n *Node) error {
 		n.Memory = memory
+		return nil
+	}
+}
+
+func WithUsedIPs(ips []string) NodeOption {
+	return func(n *Node) error {
+		n.usedIPs = ips
 		return nil
 	}
 }
@@ -89,7 +97,7 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 	n.ContainerName = config.ContainerNamePrefix + clusterLabel + "-" + name
 
 	// Set cluster IP and MAC
-	n.ClusterIP = CalculateClusterIP(clusterLabel, name)
+	n.ClusterIP = CalculateClusterIPExcluding(clusterLabel, name, n.usedIPs)
 	n.ClusterMAC = CalculateClusterMAC(clusterLabel, name)
 
 	// Handle API port logic

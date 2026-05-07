@@ -6,7 +6,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/bootc-dev/bink/internal/node"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
@@ -41,8 +40,7 @@ func NewManager(cfg Config) *Manager {
 }
 
 // AddEntry adds a DNS entry for a node to the cluster DNS server
-func (m *Manager) AddEntry(ctx context.Context, nodeName string) error {
-	nodeIP := node.CalculateClusterIP(m.clusterName, nodeName)
+func (m *Manager) AddEntry(ctx context.Context, nodeName, nodeIP string) error {
 
 	m.logger.Infof("=== Adding DNS entry for %s ===", nodeName)
 	m.logger.Infof("Node IP: %s", nodeIP)

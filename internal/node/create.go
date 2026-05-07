@@ -71,6 +71,7 @@ func (n *Node) createContainer(ctx context.Context) error {
 		Labels: map[string]string{
 			"bink.cluster-name": clusterLabel,
 			"bink.node-name":    n.Name,
+			"bink.cluster-ip":   n.ClusterIP,
 		},
 		CapAdd:      []string{"SYS_ADMIN"},
 		SelinuxOpts: []string{"disable"},
