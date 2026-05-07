@@ -1,10 +1,11 @@
-.PHONY: all build-bink build-bink-container build-cluster-image clean rebuild help test-integration test-integration-quick update-calico
+.PHONY: all build-bink build-bink-container build-cluster-image build-dns-image clean rebuild help test-integration test-integration-quick update-calico
 
 # Extract image names and versions from internal/config/defaults.go (single source of truth)
 DEFAULTS_GO := internal/config/defaults.go
 extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
 
 CLUSTER_IMAGE := $(call extract,DefaultClusterImage )
+DNS_IMAGE := $(call extract,DNSImage )
 FEDORA_VERSION := $(call extract,FedoraVersion )
 
 # Binary
@@ -36,6 +37,12 @@ build-cluster-image:
 	@echo "=== Building cluster container image ==="
 	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
+
+# Build the DNS container image
+build-dns-image:
+	@echo "=== Building DNS container image ==="
+	podman build -t $(DNS_IMAGE) -f containerfiles/dns/Containerfile containerfiles/dns
+	@echo "DNS image built: $(DNS_IMAGE)"
 
 # Clean built images
 clean:
@@ -82,6 +89,7 @@ help:
 	@echo "  build-bink               - Build the bink CLI binary"
 	@echo "  build-bink-container     - Build the bink CLI binary in container (with C deps)"
 	@echo "  build-cluster-image      - Build the cluster container image"
+	@echo "  build-dns-image          - Build the DNS container image"
 	@echo ""
 	@echo "Clean Targets:"
 	@echo "  clean                    - Remove built images"
@@ -97,3 +105,4 @@ help:
 	@echo "Outputs:"
 	@echo "  Binary:         $(BINK_BINARY)"
 	@echo "  Cluster image:  $(CLUSTER_IMAGE)"
+	@echo "  DNS image:      $(DNS_IMAGE)"

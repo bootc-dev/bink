@@ -83,11 +83,22 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		}
 	}
 
+	// Discover DNS container IP for cloud-init config
+	dnsMgr, err := dns.NewManager(clusterName)
+	if err != nil {
+		return fmt.Errorf("creating DNS manager: %w", err)
+	}
+	dnsIP, err := dnsMgr.EnsureContainer(ctx)
+	if err != nil {
+		return fmt.Errorf("ensuring DNS container: %w", err)
+	}
+
 	nodeOpts := []node.NodeOption{
 		node.WithNodeImage(nodeImage),
 		node.WithClusterName(clusterName),
 		node.WithMemory(memory),
 		node.WithUsedIPs(usedIPs),
+		node.WithDNSIP(dnsIP),
 	}
 	if isControlPlane {
 		nodeOpts = append(nodeOpts, node.WithAPIPort(-1))
@@ -114,13 +125,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 
 	// Step 2: Add DNS entry
 	logger.Info("Step 2: Adding DNS entry...")
-	dnsMgr := dns.NewManager(dns.Config{
-		ClusterName: clusterName,
-		DNSServer:   controlPlane,
-		Logger:      logger,
-	})
-
-	if err := dnsMgr.AddEntry(ctx, nodeName, newNode.ClusterIP); err != nil {
+	if err := dnsMgr.AddEntry(ctx, nodeName); err != nil {
 		return fmt.Errorf("adding DNS entry: %w", err)
 	}
 	logger.Info("")

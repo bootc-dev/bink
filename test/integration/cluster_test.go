@@ -68,12 +68,13 @@ var _ = Describe("Cluster Lifecycle", func() {
 			By("Verifying Calico CNI is running")
 			helpers.WaitForPodReady(kubeClient, "kube-system", "k8s-app=calico-node", 3*time.Minute)
 
-			By("Verifying DNS (dnsmasq) is configured")
-			dnsOutput := helpers.SSHExec(clusterName, "node1", "sudo systemctl status dnsmasq")
-			Expect(dnsOutput).To(ContainSubstring("active (running)"), "dnsmasq should be running")
+			By("Verifying DNS container is running")
+			dnsContainer := helpers.GetContainer(helpers.DNSContainerName(clusterName))
+			Expect(dnsContainer).ToNot(BeNil(), "DNS container should exist")
+			Expect(dnsContainer.State).To(Equal("running"), "DNS container should be running")
 
-			By("Verifying cluster-hosts file is configured")
-			hostsFile := helpers.SSHExec(clusterName, "node1", "cat /var/lib/dnsmasq/cluster-hosts")
+			By("Verifying cluster-hosts file in DNS container")
+			hostsFile := helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
 			Expect(hostsFile).To(ContainSubstring("node1"), "cluster-hosts should contain node1")
 			expectedIP := node.CalculateClusterIP(clusterName, "node1")
 			Expect(hostsFile).To(ContainSubstring(expectedIP), "cluster-hosts should contain node1 IP")

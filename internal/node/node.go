@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -15,6 +16,7 @@ type Node struct {
 	ClusterName     string
 	ClusterIP       string
 	ClusterMAC      string
+	DNSIP           string
 	IsControlPlane  bool
 	Memory          int
 	VCPUs           int
@@ -61,6 +63,16 @@ func WithMemory(memory int) NodeOption {
 func WithUsedIPs(ips []string) NodeOption {
 	return func(n *Node) error {
 		n.usedIPs = ips
+		return nil
+	}
+}
+
+func WithDNSIP(ip string) NodeOption {
+	return func(n *Node) error {
+		if net.ParseIP(ip) == nil {
+			return fmt.Errorf("invalid DNS IP address: %q", ip)
+		}
+		n.DNSIP = ip
 		return nil
 	}
 }

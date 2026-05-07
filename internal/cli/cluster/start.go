@@ -6,6 +6,7 @@ import (
 
 	"github.com/bootc-dev/bink/internal/cluster"
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/dns"
 	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/node"
@@ -64,7 +65,19 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 	logger.Info("")
 
-	logger.Info("Step 3: Preparing cluster images volume...")
+	logger.Info("Step 3: Ensuring DNS container...")
+	dnsMgr, err := dns.NewManager(clusterName)
+	if err != nil {
+		return fmt.Errorf("creating DNS manager: %w", err)
+	}
+	dnsIP, err := dnsMgr.EnsureContainer(ctx)
+	if err != nil {
+		return fmt.Errorf("ensuring DNS container: %w", err)
+	}
+	logger.Infof("DNS server running at %s:53", dnsIP)
+	logger.Info("")
+
+	logger.Info("Step 4: Preparing cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{
 		Name:         clusterName,
 		ControlPlane: "node1",
@@ -76,7 +89,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 	logger.Info("")
 
-	logger.Info("Step 4: Creating control plane node (node1)...")
+	logger.Info("Step 5: Creating control plane node (node1)...")
 	logger.Infof("Node image: %s", nodeImage)
 
 	podmanClient, err := podman.NewClient()
@@ -97,6 +110,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		node.WithClusterName(clusterName),
 		node.WithAPIPort(apiPort),
 		node.WithMemory(memory),
+		node.WithDNSIP(dnsIP),
 	)
 	if err != nil {
 		return fmt.Errorf("creating node: %w", err)
@@ -114,9 +128,14 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	if err := controlPlane.Create(ctx); err != nil {
 		return fmt.Errorf("creating control plane node: %w", err)
 	}
+
+	logger.Info("Adding node1 DNS entry...")
+	if err := dnsMgr.AddEntry(ctx, "node1"); err != nil {
+		return fmt.Errorf("adding node1 DNS entry: %w", err)
+	}
 	logger.Info("")
 
-	logger.Info("Step 5: Initializing Kubernetes cluster...")
+	logger.Info("Step 6: Initializing Kubernetes cluster...")
 
 	if err := clusterMgr.Init(ctx, cluster.InitOptions{
 		NodeName: "node1",
@@ -126,7 +145,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 
 	logger.Info("")
 
-	logger.Info("Step 6: Creating HAProxy load balancer...")
+	logger.Info("Step 7: Creating HAProxy load balancer...")
 	haproxyMgr, err := haproxy.NewManager(clusterName)
 	if err != nil {
 		return fmt.Errorf("creating haproxy manager: %w", err)
