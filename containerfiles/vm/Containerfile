@@ -1,7 +1,7 @@
 ARG FEDORA_VERSION=43
 FROM quay.io/fedora/fedora:${FEDORA_VERSION}
 
-RUN dnf install -y \
+RUN dnf install -y --setopt=install_weak_deps=0 \
 	libvirt-client \
 	libvirt-daemon \
 	libvirt-daemon-driver-qemu \
@@ -15,8 +15,8 @@ RUN dnf install -y \
 	bind9-next-utils \
 	openssh-clients \
 	genisoimage \
+	podman \
 	&& dnf clean all
-RUN dnf install -y --setopt=install_weak_deps=0 podman && dnf clean all
 
 COPY qemu.conf /etc/libvirt/qemu.conf
 COPY virtqemud.conf /etc/libvirt/virtqemud.conf
