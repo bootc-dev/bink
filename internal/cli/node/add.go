@@ -70,10 +70,24 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 
 	clusterName := viper.GetString("cluster.name")
 
+	// Collect IPs of existing nodes to avoid collisions
+	existingContainers, err := podmanClient.ContainerList(ctx, "label=bink.cluster-name="+clusterName)
+	if err != nil {
+		return fmt.Errorf("listing existing nodes: %w", err)
+	}
+	var usedIPs []string
+	for _, ctr := range existingContainers {
+		ip, err := podmanClient.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.cluster-ip"}}`)
+		if err == nil && ip != "" {
+			usedIPs = append(usedIPs, ip)
+		}
+	}
+
 	nodeOpts := []node.NodeOption{
 		node.WithNodeImage(nodeImage),
 		node.WithClusterName(clusterName),
 		node.WithMemory(memory),
+		node.WithUsedIPs(usedIPs),
 	}
 	if isControlPlane {
 		nodeOpts = append(nodeOpts, node.WithAPIPort(-1))
@@ -106,7 +120,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		Logger:      logger,
 	})
 
-	if err := dnsMgr.AddEntry(ctx, nodeName); err != nil {
+	if err := dnsMgr.AddEntry(ctx, nodeName, newNode.ClusterIP); err != nil {
 		return fmt.Errorf("adding DNS entry: %w", err)
 	}
 	logger.Info("")
@@ -123,6 +137,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		NodeName:       nodeName,
 		ControlPlane:   controlPlane,
 		IsControlPlane: isControlPlane,
+		NodeClusterIP:  newNode.ClusterIP,
 	}); err != nil {
 		return fmt.Errorf("joining node to cluster: %w", err)
 	}
