@@ -27,9 +27,6 @@ func (n *Node) createContainer(ctx context.Context) error {
 	logrus.Infof("Creating container %s", n.ContainerName)
 	logrus.Infof("Using node image: %s", n.NodeImage)
 
-	// Cluster images volume is shared across all clusters (same images for all)
-	clusterImagesVolume := "cluster-images"
-
 	// Cluster keys volume is namespaced per cluster
 	clusterLabel := n.ClusterName
 	if clusterLabel == "" {
@@ -64,7 +61,7 @@ func (n *Node) createContainer(ctx context.Context) error {
 				Options: []string{"z"},
 			},
 			{
-				Name:    clusterImagesVolume,
+				Name:    n.ClusterImagesVolume,
 				Dest:    "/var/lib/cluster-images",
 				Options: []string{"z"},
 			},

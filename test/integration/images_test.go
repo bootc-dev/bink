@@ -15,16 +15,22 @@ import (
 )
 
 var _ = Describe("Cluster Images Volume", Serial, func() {
+	var (
+		podmanClient *podman.Client
+		volumeName   string
+	)
+
 	BeforeEach(func() {
 		helpers.RequireImage(config.DefaultNodeImage)
 
 		ctx := context.Background()
-		podmanClient, err := podman.NewClient()
+		var err error
+		podmanClient, err = podman.NewClient()
 		Expect(err).ToNot(HaveOccurred())
 
 		_ = podmanClient.ContainerRemove(ctx, cluster.PopulatorContainerName, true)
 
-		// Remove containers using the volume before removing it
+		// Remove containers using volumes before removing them
 		containers, err := podmanClient.ContainerList(ctx, "")
 		Expect(err).ToNot(HaveOccurred())
 		for _, name := range containers {
@@ -32,54 +38,62 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 			_ = podmanClient.ContainerRemove(ctx, name, true)
 		}
 
+		// Determine the expected volume name from the node image label
+		kubeadmVersion, err := cluster.GetKubeadmVersionFromImage(ctx, podmanClient, config.DefaultNodeImage)
+		Expect(err).ToNot(HaveOccurred())
+		volumeName = cluster.ClusterImagesVolumeName(kubeadmVersion)
+
 		Eventually(func() error {
-			exists, err := podmanClient.VolumeExists(ctx, cluster.ClusterImagesVolume)
+			exists, err := podmanClient.VolumeExists(ctx, volumeName)
 			if err != nil {
 				return err
 			}
 			if !exists {
 				return nil
 			}
-			return podmanClient.VolumeRemove(ctx, cluster.ClusterImagesVolume)
+			return podmanClient.VolumeRemove(ctx, volumeName)
 		}, 30*time.Second, 2*time.Second).Should(Succeed())
 	})
 
 	AfterEach(func() {
 		ctx := context.Background()
-		podmanClient, err := podman.NewClient()
-		Expect(err).ToNot(HaveOccurred())
 
 		_ = podmanClient.ContainerRemove(ctx, "test-images-verify", true)
 		_ = podmanClient.ContainerRemove(ctx, cluster.PopulatorContainerName, true)
 	})
 
-	It("should populate the cluster-images volume with Kubernetes and Calico images", func() {
+	It("should populate a versioned cluster-images volume with Kubernetes and Calico images", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 
 		By("Verifying volume does not exist")
-		podmanClient, err := podman.NewClient()
-		Expect(err).ToNot(HaveOccurred())
-
-		exists, err := podmanClient.VolumeExists(ctx, cluster.ClusterImagesVolume)
+		exists, err := podmanClient.VolumeExists(ctx, volumeName)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exists).To(BeFalse())
 
 		By("Populating the cluster-images volume via EnsureImagesVolume")
 		c := cluster.New(cluster.Config{Name: "test-images"})
-		err = c.EnsureImagesVolume(ctx, config.DefaultNodeImage)
+		returnedVolumeName, err := c.EnsureImagesVolume(ctx, config.DefaultNodeImage)
 		Expect(err).ToNot(HaveOccurred())
+		Expect(returnedVolumeName).To(Equal(volumeName))
 
-		By("Verifying volume was created")
-		exists, err = podmanClient.VolumeExists(ctx, cluster.ClusterImagesVolume)
+		By("Verifying volume was created with correct name")
+		exists, err = podmanClient.VolumeExists(ctx, volumeName)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exists).To(BeTrue())
+
+		By("Verifying volume has version labels")
+		labels, err := podmanClient.VolumeInspectLabels(ctx, volumeName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(labels).To(HaveKey("bink.kubeadm-version"))
+		Expect(labels).To(HaveKey("bink.node-image"))
+		Expect(labels["bink.node-image"]).To(Equal(config.DefaultNodeImage))
 
 		By("Verifying volume is marked as completed")
 		err = podmanClient.ContainerRunQuiet(ctx,
 			config.DefaultClusterImage,
 			[]string{"test", "-f", "/check/.completed"},
-			[]string{cluster.ClusterImagesVolume + ":/check:z"},
+			[]string{volumeName + ":/check:z"},
 		)
 		Expect(err).ToNot(HaveOccurred(), ".completed marker should exist in the volume")
 
@@ -90,7 +104,7 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 			Image:   config.DefaultClusterImage,
 			Command: []string{"sleep", "infinity"},
 			Volumes: []*specgen.NamedVolume{{
-				Name: cluster.ClusterImagesVolume,
+				Name: volumeName,
 				Dest: "/var/lib/containers/storage",
 			}},
 		})

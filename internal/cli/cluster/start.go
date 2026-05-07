@@ -10,7 +10,6 @@ import (
 	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/node"
-	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/registry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -97,7 +96,8 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		Logger:       logger,
 	})
 
-	if err := clusterMgr.EnsureImagesVolume(ctx, nodeImage); err != nil {
+	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)
+	if err != nil {
 		return fmt.Errorf("ensuring images volume: %w", err)
 	}
 	logger.Info("")
@@ -116,6 +116,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		node.WithAPIPort(apiPort),
 		node.WithMemory(memory),
 		node.WithDNSIP(dnsIP),
+		node.WithClusterImagesVolume(clusterImagesVolume),
 	)
 	if err != nil {
 		return fmt.Errorf("creating node: %w", err)

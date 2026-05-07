@@ -11,23 +11,24 @@ import (
 )
 
 type Node struct {
-	Name            string
-	ContainerName   string
-	ClusterName     string
-	ClusterIP       string
-	ClusterMAC      string
-	DNSIP           string
-	IsControlPlane  bool
-	Memory          int
-	VCPUs           int
-	BaseDisk        string
-	NodeImage     string
-	APIPort         int // Configured API port (0 = auto-assign)
-	AssignedAPIPort int // Actual assigned port after container creation
+	Name                string
+	ContainerName       string
+	ClusterName         string
+	ClusterIP           string
+	ClusterMAC          string
+	DNSIP               string
+	IsControlPlane      bool
+	Memory              int
+	VCPUs               int
+	BaseDisk            string
+	NodeImage           string
+	ClusterImagesVolume string
+	APIPort             int // Configured API port (0 = auto-assign)
+	AssignedAPIPort     int // Actual assigned port after container creation
 
-	usedIPs      []string
-	podman       *podman.Client
-	virsh        *virsh.Client
+	usedIPs []string
+	podman  *podman.Client
+	virsh   *virsh.Client
 }
 
 type NodeOption func(*Node) error
@@ -77,6 +78,13 @@ func WithDNSIP(ip string) NodeOption {
 	}
 }
 
+func WithClusterImagesVolume(volumeName string) NodeOption {
+	return func(n *Node) error {
+		n.ClusterImagesVolume = volumeName
+		return nil
+	}
+}
+
 func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 	n := &Node{
 		Name:           name,
@@ -91,6 +99,10 @@ func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
 		if err := opt(n); err != nil {
 			return nil, err
 		}
+	}
+
+	if n.ClusterImagesVolume == "" {
+		return nil, fmt.Errorf("cluster images volume name is required: use WithClusterImagesVolume()")
 	}
 
 	if n.podman == nil {
