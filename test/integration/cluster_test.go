@@ -52,17 +52,21 @@ var _ = Describe("Cluster Lifecycle", func() {
 			}
 			Expect(portPublished).To(BeTrue(), "API server port (6443/tcp) should be published to a random host port")
 
+			By("Exposing API and creating Kubernetes client")
+			kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
+			defer helpers.CleanupKubeconfig(kubeconfigPath)
+
 			By("Verifying Kubernetes is initialized and node is Ready")
-			output := helpers.SSHExec(clusterName, "node1", "sudo kubectl get nodes --kubeconfig=/etc/kubernetes/admin.conf")
-			Expect(output).To(ContainSubstring("node1"), "node1 should appear in node list")
-			Expect(output).To(ContainSubstring("Ready"), "node1 should be Ready")
-			Expect(output).To(ContainSubstring("control-plane"), "node1 should have control-plane role")
+			helpers.WaitForNodeReady(kubeClient, "node1", 5*time.Minute)
+
+			By("Verifying node1 has control-plane role")
+			n1, err := kubeClient.CoreV1().Nodes().Get(context.Background(), "node1", metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			_, hasCP := n1.Labels["node-role.kubernetes.io/control-plane"]
+			Expect(hasCP).To(BeTrue(), "node1 should have control-plane role")
 
 			By("Verifying Calico CNI is running")
-			Eventually(func() string {
-				output, _ := helpers.SSHExecQuiet(clusterName, "node1", "sudo kubectl get pods -n kube-system --kubeconfig=/etc/kubernetes/admin.conf")
-				return output
-			}, "3m", "10s").Should(ContainSubstring("calico"), "Calico pods should be running")
+			helpers.WaitForPodReady(kubeClient, "kube-system", "k8s-app=calico-node", 3*time.Minute)
 
 			By("Verifying DNS (dnsmasq) is configured")
 			dnsOutput := helpers.SSHExec(clusterName, "node1", "sudo systemctl status dnsmasq")
@@ -73,10 +77,6 @@ var _ = Describe("Cluster Lifecycle", func() {
 			Expect(hostsFile).To(ContainSubstring("node1"), "cluster-hosts should contain node1")
 			expectedIP := node.CalculateClusterIP(clusterName, "node1")
 			Expect(hostsFile).To(ContainSubstring(expectedIP), "cluster-hosts should contain node1 IP")
-
-			By("Exposing API and creating Kubernetes client")
-			kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
-			defer helpers.CleanupKubeconfig(kubeconfigPath)
 
 			By("Removing control-plane taint to allow scheduling on single-node cluster")
 			helpers.RemoveControlPlaneTaint(kubeClient, "node1")

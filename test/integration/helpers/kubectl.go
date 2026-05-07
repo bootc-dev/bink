@@ -1,9 +1,11 @@
 package helpers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -13,8 +15,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
-	"strings"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 // NewKubeClient creates a Kubernetes clientset from a kubeconfig file.
@@ -173,6 +176,49 @@ func WaitForDaemonSetReady(client *kubernetes.Clientset, namespace, name string,
 		}
 		return ds.Status.NumberReady
 	}, timeout, 10*time.Second).Should(Equal(expectedReady), "DaemonSet %s should have %d ready pods", name, expectedReady)
+}
+
+// PodExec executes a command inside a running pod and returns the output.
+func PodExec(kubeconfigPath, namespace, podName string, command []string) (string, error) {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		return "", fmt.Errorf("building kubeconfig: %w", err)
+	}
+	config.TLSClientConfig.Insecure = true
+	config.TLSClientConfig.CAData = nil
+	config.TLSClientConfig.CAFile = ""
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return "", fmt.Errorf("creating clientset: %w", err)
+	}
+
+	req := clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Command: command,
+			Stdout:  true,
+			Stderr:  true,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	if err != nil {
+		return "", fmt.Errorf("creating SPDY executor: %w", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return stdout.String(), fmt.Errorf("exec failed (stderr: %s): %w", stderr.String(), err)
+	}
+
+	return strings.TrimSpace(stdout.String()), nil
 }
 
 // GetPodNodes returns a list of node names where pods with the given label are running.

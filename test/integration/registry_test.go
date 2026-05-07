@@ -75,8 +75,8 @@ var _ = Describe("Local Registry", func() {
 
 		By("Verifying the container is functional by running a command inside it")
 		Eventually(func() string {
-			result, _ := helpers.SSHExecQuiet(clusterName, "node1",
-				"sudo kubectl exec registry-test --kubeconfig=/etc/kubernetes/admin.conf -- echo hello")
+			result, _ := helpers.PodExec(kubeconfigPath, "default", "registry-test",
+				[]string{"echo", "hello"})
 			return result
 		}, 1*time.Minute, 5*time.Second).Should(ContainSubstring("hello"))
 
