@@ -305,16 +305,16 @@ var _ = Describe("Multi-Node Clusters", func() {
 
 		By("Testing cross-node pod communication via service")
 		Eventually(func() string {
-			result, _ := helpers.SSHExecQuiet(clusterName, node1,
-				"sudo kubectl exec echo-client --kubeconfig=/etc/kubernetes/admin.conf -- wget -qO- -T 5 http://echo-server.default.svc.cluster.local:8080")
+			result, _ := helpers.PodExec(kubeconfigPath, "default", "echo-client",
+				[]string{"wget", "-qO-", "-T", "5", "http://echo-server.default.svc.cluster.local:8080"})
 			return result
 		}, 2*time.Minute, 10*time.Second).Should(ContainSubstring("hello from echo-server"),
 			"echo-client on node2 should reach echo-server on node1 via service")
 
 		By("Verifying DNS resolution from a pod")
 		Eventually(func() string {
-			result, _ := helpers.SSHExecQuiet(clusterName, node1,
-				"sudo kubectl exec echo-client --kubeconfig=/etc/kubernetes/admin.conf -- nslookup kubernetes.default.svc.cluster.local")
+			result, _ := helpers.PodExec(kubeconfigPath, "default", "echo-client",
+				[]string{"nslookup", "kubernetes.default.svc.cluster.local"})
 			return result
 		}, 2*time.Minute, 10*time.Second).Should(ContainSubstring("kubernetes.default.svc.cluster.local"),
 			"DNS resolution should work from a pod via CoreDNS")

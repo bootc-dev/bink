@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,12 +40,14 @@ var _ = Describe("Multi-Cluster Operations", func() {
 		Expect(containerB.State).To(Equal("running"), "Cluster B container should be running")
 
 		By("Verifying first cluster has working Kubernetes")
-		outputA := helpers.SSHExec(clusterNameA, "node1", "sudo kubectl get nodes --kubeconfig=/etc/kubernetes/admin.conf")
-		Expect(outputA).To(ContainSubstring("Ready"), "Cluster A node should be Ready")
+		kubeClientA, kubeconfigPathA := helpers.SetupKubeClient(clusterNameA)
+		defer helpers.CleanupKubeconfig(kubeconfigPathA)
+		helpers.WaitForNodeReady(kubeClientA, "node1", 5*time.Minute)
 
 		By("Verifying second cluster has working Kubernetes")
-		outputB := helpers.SSHExec(clusterNameB, "node1", "sudo kubectl get nodes --kubeconfig=/etc/kubernetes/admin.conf")
-		Expect(outputB).To(ContainSubstring("Ready"), "Cluster B node should be Ready")
+		kubeClientB, kubeconfigPathB := helpers.SetupKubeClient(clusterNameB)
+		defer helpers.CleanupKubeconfig(kubeconfigPathB)
+		helpers.WaitForNodeReady(kubeClientB, "node1", 5*time.Minute)
 
 		By("Verifying clusters have separate cluster-keys volumes")
 		Expect(helpers.GetVolume(fmt.Sprintf("%s-cluster-keys", clusterNameA))).To(BeTrue(), "Cluster A should have its own keys volume")
@@ -71,7 +74,6 @@ var _ = Describe("Multi-Cluster Operations", func() {
 		Expect(containerB.State).To(Equal("running"), "Cluster B container should still be running")
 
 		By("Verifying second cluster Kubernetes is still functional")
-		outputB = helpers.SSHExec(clusterNameB, "node1", "sudo kubectl get nodes --kubeconfig=/etc/kubernetes/admin.conf")
-		Expect(outputB).To(ContainSubstring("Ready"), "Cluster B node should still be Ready")
+		helpers.WaitForNodeReady(kubeClientB, "node1", 5*time.Minute)
 	})
 })
