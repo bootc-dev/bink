@@ -35,6 +35,12 @@ jobs:
           sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
+      - name: Enable KSM (Kernel Same-page Merging)
+        run: |
+          sudo sh -c 'echo 1 > /sys/kernel/mm/ksm/run'
+          sudo sh -c 'echo 5000 > /sys/kernel/mm/ksm/pages_to_scan'
+          cat /sys/kernel/mm/ksm/run
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
