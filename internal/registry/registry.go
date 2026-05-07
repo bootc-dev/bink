@@ -29,17 +29,6 @@ func NewManager() (*Manager, error) {
 func (m *Manager) EnsureRegistry(ctx context.Context) error {
 	logrus.Info("Ensuring local registry is running")
 
-	exists, err := m.podman.ContainerExists(ctx, config.RegistryContainerName)
-	if err != nil {
-		return fmt.Errorf("checking registry container: %w", err)
-	}
-
-	if exists {
-		return m.ensureRunning(ctx)
-	}
-
-	logrus.Info("Creating registry container")
-
 	if err := m.podman.EnsureImage(ctx, config.RegistryImage); err != nil {
 		return fmt.Errorf("ensuring registry image: %w", err)
 	}
@@ -75,17 +64,17 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 		},
 	}
 
-	if _, err := m.podman.ContainerCreate(ctx, opts); err != nil {
-		if strings.Contains(err.Error(), "is already in use") {
-			logrus.Info("Registry container was created concurrently, ensuring it is running")
-			return m.ensureRunning(ctx)
-		}
+	_, err := m.podman.ContainerCreate(ctx, opts)
+	switch {
+	case err == nil:
+		logrus.Infof("Registry running at %s:%d (host: localhost:%d)",
+			config.RegistryStaticIP, config.RegistryPort, config.RegistryPort)
+		return nil
+	case strings.Contains(err.Error(), "is already in use"):
+		return m.ensureRunning(ctx)
+	default:
 		return fmt.Errorf("creating registry container: %w", err)
 	}
-
-	logrus.Infof("Registry running at %s:%d (host: localhost:%d)",
-		config.RegistryStaticIP, config.RegistryPort, config.RegistryPort)
-	return nil
 }
 
 func (m *Manager) ensureRunning(ctx context.Context) error {

@@ -12,9 +12,6 @@ concurrency:
 
 jobs:
   integration-tests:
-    # Standard ubuntu-latest runners have 7GB RAM and ~14GB free disk.
-    # Multi-node tests (haproxy, workload, multinode HA) need 12GB+ RAM for VMs.
-    # For the full suite, use a larger runner (e.g. ubuntu-latest-8-core with 32GB RAM).
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
