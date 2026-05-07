@@ -1,17 +1,32 @@
-FROM quay.io/fedora/fedora-bootc as root
+FROM quay.io/fedora/fedora-bootc:43 AS builder
 
 ARG KUBE_MINOR=1.35
-RUN dnf install -y \
-    kubernetes \
-    kubernetes${KUBE_MINOR}-kubeadm \
-    cri-o${KUBE_MINOR} \
-    openssh-server \
-    qemu-guest-agent \
-    bind-utils \
-    iputils \
-    cloud-init \
-    dnsmasq \
-    && dnf clean all
-RUN passwd -d root
+RUN /usr/libexec/bootc-base-imagectl build-rootfs \
+    --manifest=minimal \
+    --no-docs \
+    --install NetworkManager \
+    --install openssh-server \
+    --install openssh-clients \
+    --install kubernetes \
+    --install kubernetes${KUBE_MINOR}-kubeadm \
+    --install cri-o${KUBE_MINOR} \
+    --install qemu-guest-agent \
+    --install bind-utils \
+    --install iputils \
+    --install cloud-init \
+    --install dnsmasq \
+    --install bubblewrap \
+    --install sudo \
+    /target-rootfs
 
+FROM scratch AS root
+COPY --from=builder /target-rootfs/ /
+
+RUN passwd -d root
 RUN sed -i 's|"/opt/cni/bin"|"/var/lib/cni/bin"|g' /etc/crio/crio.conf
+RUN bootc container lint
+
+LABEL containers.bootc 1
+LABEL ostree.bootable 1
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
