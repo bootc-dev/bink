@@ -1,0 +1,45 @@
+name: Build and Push DNS Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'containerfiles/dns/**'
+  pull_request:
+    paths:
+      - 'containerfiles/dns/**'
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'Push image to registry'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/dns
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == 'true')
+        run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+
+      - name: Build DNS image
+        run: make build-dns-image
+
+      - name: Tag and push
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == 'true')
+        run: |
+          podman tag localhost/bink-dns:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
