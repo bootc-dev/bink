@@ -36,7 +36,7 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&controlPlane, "control-plane", "c", "node1", "Control plane node name")
 	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().StringVarP(&role, "role", "r", "worker", "Node role: worker or control-plane")
-	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 8192 MB)")
+	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 2048 MB)")
 
 	return cmd
 }
