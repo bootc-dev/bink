@@ -12,7 +12,7 @@ FEDORA_VERSION := $(call extract,FedoraVersion )
 BINK_BINARY := bink
 
 # Directories
-VM_DIR := containerfiles/vm
+VM_DIR := containerfiles/cluster-image
 
 all: build-bink
 
