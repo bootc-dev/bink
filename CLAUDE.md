@@ -42,7 +42,7 @@ make build-images-container   # Wrap qcow2 in a container for image-volume mount
 
 - `--cluster-name` names the cluster (default: `podman`). All containers are prefixed `k8s-<cluster>-<node>`.
 - `--api-port 0` auto-assigns a random host port for the Kubernetes API (recommended to avoid conflicts). Use a specific port number to pin it.
-- `--memory` sets VM RAM in MB (default: 8192).
+- `--memory` sets VM RAM in MB (default: 2048).
 
 This creates container `k8s-mycluster-node1`, initializes kubeadm, installs Calico CNI, and configures CoreDNS.
 

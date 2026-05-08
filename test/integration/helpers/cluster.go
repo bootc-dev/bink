@@ -40,19 +40,17 @@ func RunCommand(cmd *exec.Cmd, timeout ...time.Duration) *gexec.Session {
 // CreateCluster creates a cluster with the given name
 // This is a high-level helper that expects success
 // Uses auto-assigned ports (--api-port 0) to avoid port conflicts in tests
-// Uses 4GB memory to allow parallel test execution
 func CreateCluster(name string) {
-	GinkgoWriter.Printf("Creating cluster: %s (with auto-assigned API port and 4GB memory)\n", name)
-	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0", "--memory", "4096")
+	GinkgoWriter.Printf("Creating cluster: %s (with auto-assigned API port)\n", name)
+	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0")
 	session := RunCommand(cmd, 10*time.Minute)
 	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
 }
 
 // AddNode adds a node to the cluster
-// Uses 4GB memory to allow parallel test execution
 func AddNode(clusterName, nodeName string, extraArgs ...string) {
-	GinkgoWriter.Printf("Adding node %s to cluster %s (with 4GB memory)\n", nodeName, clusterName)
-	args := []string{"node", "add", nodeName, "--cluster-name", clusterName, "--memory", "4096"}
+	GinkgoWriter.Printf("Adding node %s to cluster %s\n", nodeName, clusterName)
+	args := []string{"node", "add", nodeName, "--cluster-name", clusterName}
 	args = append(args, extraArgs...)
 	cmd := BinkCmd(args...)
 	session := RunCommand(cmd, 10*time.Minute)
