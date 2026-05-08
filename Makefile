@@ -14,7 +14,7 @@ BINK_BINARY := bink
 # Directories
 VM_DIR := containerfiles/vm
 
-all: build-cluster-image build-bink
+all: build-bink
 
 # Build the bink CLI binary
 build-bink:
