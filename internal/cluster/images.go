@@ -213,19 +213,19 @@ func (c *Cluster) isPopulationInProgress(ctx context.Context) bool {
 func (c *Cluster) waitForPopulationComplete(ctx context.Context) error {
 	logrus.Debugf("Waiting for populator container %s to complete...", PopulatorContainerName)
 
-	exitCode, err := c.podmanClient.ContainerWait(ctx, PopulatorContainerName)
+	_, err := c.podmanClient.ContainerWait(ctx, PopulatorContainerName)
 	if err != nil {
 		logrus.Debugf("Container wait failed (may have already completed): %v", err)
+	}
+
+	// The populator runs "sleep infinity" and gets force-removed when done,
+	// so the exit code is always non-zero (137 = SIGKILL). Check the
+	// completion marker instead.
+	if c.isVolumeCompleted(ctx, ClusterImagesVolume) {
 		return nil
 	}
 
-	logrus.Debugf("Populator container exited with code: %d", exitCode)
-
-	if exitCode != 0 {
-		return fmt.Errorf("population failed with exit code %d", exitCode)
-	}
-
-	return nil
+	return fmt.Errorf("population did not complete successfully (no .completed marker)")
 }
 
 // markVolumeCompleted creates a marker file indicating successful population
