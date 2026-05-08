@@ -9,6 +9,7 @@ import (
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/containers/podman/v5/pkg/specgen"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -136,8 +137,10 @@ func (c *Cluster) EnsureImagesVolume(ctx context.Context, nodeImage string) (str
 			if waitErr := c.waitForPopulationComplete(ctx, populatorName, volumeName); waitErr != nil {
 				return "", fmt.Errorf("waiting for concurrent population: %w", waitErr)
 			}
-			logrus.Infof("Concurrent population complete")
-			return volumeName, nil
+			if c.isVolumeCompleted(ctx, volumeName) {
+				logrus.Infof("Concurrent population complete")
+				return volumeName, nil
+			}
 		}
 		return "", fmt.Errorf("populating volume: %w", err)
 	}
@@ -178,8 +181,10 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 			Source:      nodeImage,
 			Destination: "/images",
 		}},
-		Volumes:    []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
-		Privileged: true,
+		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
+		CapAdd:  []string{"SYS_ADMIN"},
+		Devices: []specs.LinuxDevice{{Path: "/dev/fuse"}},
+		SelinuxOpts: []string{"disable"},
 	}
 
 	_, err := c.podmanClient.ContainerCreate(ctx, opts)

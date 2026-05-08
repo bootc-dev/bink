@@ -10,6 +10,7 @@ import (
 	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/network"
 	"github.com/bootc-dev/bink/internal/node"
+	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/registry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
