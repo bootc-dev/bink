@@ -77,7 +77,20 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	logger.Infof("DNS server running at %s:53", dnsIP)
 	logger.Info("")
 
-	logger.Info("Step 4: Preparing cluster images volume...")
+	logger.Info("Step 4: Ensuring required images...")
+	podmanClient, err := podman.NewClient()
+	if err != nil {
+		return fmt.Errorf("creating podman client: %w", err)
+	}
+	if err := podmanClient.EnsureImage(ctx, config.DefaultClusterImage); err != nil {
+		return fmt.Errorf("ensuring cluster image: %w", err)
+	}
+	if err := podmanClient.EnsureImage(ctx, nodeImage); err != nil {
+		return fmt.Errorf("ensuring node image: %w", err)
+	}
+	logger.Info("")
+
+	logger.Info("Step 5: Preparing cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{
 		Name:         clusterName,
 		ControlPlane: "node1",
@@ -89,16 +102,8 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 	logger.Info("")
 
-	logger.Info("Step 5: Creating control plane node (node1)...")
+	logger.Info("Step 6: Creating control plane node (node1)...")
 	logger.Infof("Node image: %s", nodeImage)
-
-	podmanClient, err := podman.NewClient()
-	if err != nil {
-		return fmt.Errorf("creating podman client: %w", err)
-	}
-	if err := podmanClient.EnsureImage(ctx, nodeImage); err != nil {
-		return fmt.Errorf("ensuring node image: %w", err)
-	}
 
 	// Convert 0 to -1 for auto-assign (to distinguish from unset)
 	if apiPort == 0 {
@@ -135,7 +140,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 	logger.Info("")
 
-	logger.Info("Step 6: Initializing Kubernetes cluster...")
+	logger.Info("Step 7: Initializing Kubernetes cluster...")
 
 	if err := clusterMgr.Init(ctx, cluster.InitOptions{
 		NodeName: "node1",
@@ -145,7 +150,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 
 	logger.Info("")
 
-	logger.Info("Step 7: Creating HAProxy load balancer...")
+	logger.Info("Step 8: Creating HAProxy load balancer...")
 	haproxyMgr, err := haproxy.NewManager(clusterName)
 	if err != nil {
 		return fmt.Errorf("creating haproxy manager: %w", err)

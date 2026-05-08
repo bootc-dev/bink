@@ -64,6 +64,9 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	if err != nil {
 		return fmt.Errorf("creating podman client: %w", err)
 	}
+	if err := podmanClient.EnsureImage(ctx, config.DefaultClusterImage); err != nil {
+		return fmt.Errorf("ensuring cluster image: %w", err)
+	}
 	if err := podmanClient.EnsureImage(ctx, nodeImage); err != nil {
 		return fmt.Errorf("ensuring node image: %w", err)
 	}

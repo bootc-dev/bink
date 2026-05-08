@@ -16,7 +16,6 @@ import (
 
 var _ = Describe("Cluster Images Volume", Serial, func() {
 	BeforeEach(func() {
-		helpers.RequireImage(config.DefaultClusterImage)
 		helpers.RequireImage(config.DefaultNodeImage)
 
 		ctx := context.Background()
