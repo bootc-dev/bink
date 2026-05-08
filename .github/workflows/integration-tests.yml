@@ -73,17 +73,9 @@ jobs:
       - name: Build bink binary
         run: sudo make build-bink-container
 
-      - name: Build cluster image
-        run: sudo make build-cluster-image
-
-      - name: Build DNS image
-        run: sudo make build-dns-image
-
       - name: Verify prerequisites
         run: |
           test -f ./bink
-          sudo podman image exists localhost/cluster:latest
-          sudo podman image exists localhost/bink-dns:latest
           sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
           df -h /
           free -h
