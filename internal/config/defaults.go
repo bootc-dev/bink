@@ -6,7 +6,7 @@ const (
 
 	FedoraVersion = "43"
 
-	DefaultClusterImage = "localhost/cluster:latest"
+	DefaultClusterImage = "ghcr.io/alicefr/bink/cluster:latest"
 	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-43-disk"
 
 	DefaultBaseDisk = "/images/disk.qcow2"
@@ -44,7 +44,7 @@ const (
 	ContainerNamePrefix = "k8s-"
 
 	DNSContainerName = "dns"
-	DNSImage         = "localhost/bink-dns:latest"
+	DNSImage         = "ghcr.io/alicefr/bink/dns:latest"
 	DNSMasqHostsFile = "/var/lib/dnsmasq/cluster-hosts"
 	DNSMasqConfigDir = "/etc/dnsmasq.d"
 	ClusterDomain    = "cluster.local"
