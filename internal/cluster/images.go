@@ -220,9 +220,15 @@ func (c *Cluster) waitForPopulationComplete(ctx context.Context) error {
 
 	// The populator runs "sleep infinity" and gets force-removed when done,
 	// so the exit code is always non-zero (137 = SIGKILL). Check the
-	// completion marker instead.
-	if c.isVolumeCompleted(ctx, ClusterImagesVolume) {
-		return nil
+	// completion marker instead. The marker is written after the populator
+	// is removed, so retry briefly.
+	for i := range 5 {
+		if c.isVolumeCompleted(ctx, ClusterImagesVolume) {
+			return nil
+		}
+		if i < 4 {
+			time.Sleep(time.Second)
+		}
 	}
 
 	return fmt.Errorf("population did not complete successfully (no .completed marker)")
