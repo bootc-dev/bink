@@ -68,7 +68,7 @@ func runStop(ctx context.Context, logger *logrus.Logger, force, removeData bool)
 		return nil
 	}
 
-	logger.Infof("Found %d node(s) to stop:", len(containers))
+	logger.Infof("Found %d container(s) to stop:", len(containers))
 	for _, container := range containers {
 		logger.Infof("  - %s", container)
 	}
