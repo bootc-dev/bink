@@ -37,9 +37,6 @@ jobs:
       - name: Build DNS image
         run: make build-dns-image
 
-      - name: Tag and push
+      - name: Push
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
-        run: |
-          podman tag localhost/bink-dns:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        run: podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
