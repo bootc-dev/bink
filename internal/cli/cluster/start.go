@@ -97,7 +97,8 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		Logger:       logger,
 	})
 
-	if err := clusterMgr.EnsureImagesVolume(ctx, nodeImage); err != nil {
+	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)
+	if err != nil {
 		return fmt.Errorf("ensuring images volume: %w", err)
 	}
 	logger.Info("")
@@ -116,6 +117,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		node.WithAPIPort(apiPort),
 		node.WithMemory(memory),
 		node.WithDNSIP(dnsIP),
+		node.WithClusterImagesVolume(clusterImagesVolume),
 	)
 	if err != nil {
 		return fmt.Errorf("creating node: %w", err)

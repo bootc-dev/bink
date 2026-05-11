@@ -56,9 +56,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	logger.Infof("=== Creating %s node %s ===", role, nodeName)
 	logger.Info("")
 
-	// Step 1: Create the new node
-	logger.Infof("Step 1: Creating %s node...", role)
-	logger.Infof("Node image: %s", nodeImage)
+	clusterName := viper.GetString("cluster.name")
 
 	podmanClient, err := podman.NewClient()
 	if err != nil {
@@ -67,11 +65,24 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	if err := podmanClient.EnsureImage(ctx, config.DefaultClusterImage); err != nil {
 		return fmt.Errorf("ensuring cluster image: %w", err)
 	}
-	if err := podmanClient.EnsureImage(ctx, nodeImage); err != nil {
-		return fmt.Errorf("ensuring node image: %w", err)
-	}
 
-	clusterName := viper.GetString("cluster.name")
+	// Ensure images volume exists for this node image version
+	logger.Infof("Step 0: Ensuring cluster images volume...")
+	clusterMgr := cluster.New(cluster.Config{
+		Name:         clusterName,
+		ControlPlane: controlPlane,
+		Logger:       logger,
+	})
+
+	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)
+	if err != nil {
+		return fmt.Errorf("ensuring images volume: %w", err)
+	}
+	logger.Info("")
+
+	// Step 1: Create the new node
+	logger.Infof("Step 1: Creating %s node...", role)
+	logger.Infof("Node image: %s", nodeImage)
 
 	// Collect IPs of existing nodes to avoid collisions
 	existingContainers, err := podmanClient.ContainerList(ctx, "label=bink.cluster-name="+clusterName)
@@ -102,6 +113,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		node.WithMemory(memory),
 		node.WithUsedIPs(usedIPs),
 		node.WithDNSIP(dnsIP),
+		node.WithClusterImagesVolume(clusterImagesVolume),
 	}
 	if isControlPlane {
 		nodeOpts = append(nodeOpts, node.WithAPIPort(-1))
@@ -135,11 +147,6 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 
 	// Step 3: Join to cluster
 	logger.Info("Step 3: Joining node to cluster...")
-	clusterMgr := cluster.New(cluster.Config{
-		Name:         clusterName,
-		ControlPlane: controlPlane,
-		Logger:       logger,
-	})
 
 	if err := clusterMgr.Join(ctx, cluster.JoinOptions{
 		NodeName:       nodeName,

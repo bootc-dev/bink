@@ -33,7 +33,7 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 		return fmt.Errorf("ensuring registry image: %w", err)
 	}
 
-	if err := m.podman.VolumeCreate(ctx, config.RegistryVolume); err != nil {
+	if err := m.podman.VolumeCreate(ctx, config.RegistryVolume, nil); err != nil {
 		return fmt.Errorf("creating registry volume: %w", err)
 	}
 

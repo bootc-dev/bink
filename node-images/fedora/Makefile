@@ -38,6 +38,7 @@ build-disk-image: build-bootc-image
 		--build-arg BOOTC_IMAGE="$(BOOTC_IMAGE)" \
 		--build-arg DISK_SIZE="$(DISK_SIZE)" \
 		--build-arg MEMORY="$(BUILD_MEMORY)" \
+		--build-arg KUBE_MINOR="$(KUBE_MINOR)" \
 		-t $(NODE_IMAGE) \
 		-f Containerfile.disk \
 		.

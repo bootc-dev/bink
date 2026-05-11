@@ -607,7 +607,7 @@ func (c *Client) VolumeExists(ctx context.Context, name string) (bool, error) {
 	return true, nil
 }
 
-func (c *Client) VolumeCreate(ctx context.Context, name string) error {
+func (c *Client) VolumeCreate(ctx context.Context, name string, labels map[string]string) error {
 	if err := c.ensureConnection(); err != nil {
 		return err
 	}
@@ -615,7 +615,8 @@ func (c *Client) VolumeCreate(ctx context.Context, name string) error {
 	logrus.Infof("Creating volume '%s'", name)
 
 	opts := entities.VolumeCreateOptions{
-		Name: name,
+		Name:   name,
+		Labels: labels,
 	}
 	_, err := volumes.Create(c.conn, opts, nil)
 	if err != nil {
@@ -628,6 +629,36 @@ func (c *Client) VolumeCreate(ctx context.Context, name string) error {
 
 	logrus.Infof("Volume '%s' created successfully", name)
 	return nil
+}
+
+func (c *Client) VolumeInspectLabels(ctx context.Context, name string) (map[string]string, error) {
+	if err := c.ensureConnection(); err != nil {
+		return nil, err
+	}
+
+	data, err := volumes.Inspect(c.conn, name, nil)
+	if err != nil {
+		return nil, fmt.Errorf("inspecting volume %s: %w", name, err)
+	}
+
+	return data.Labels, nil
+}
+
+func (c *Client) ImageInspectLabels(ctx context.Context, name string) (map[string]string, error) {
+	if err := c.ensureConnection(); err != nil {
+		return nil, err
+	}
+
+	data, err := images.GetImage(c.conn, name, nil)
+	if err != nil {
+		return nil, fmt.Errorf("inspecting image %s: %w", name, err)
+	}
+
+	if data.Config == nil {
+		return nil, nil
+	}
+
+	return data.Config.Labels, nil
 }
 
 func (c *Client) VolumeList(ctx context.Context, filter string) ([]string, error) {
