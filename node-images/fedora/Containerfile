@@ -1,9 +1,9 @@
-FROM quay.io/fedora/fedora-bootc:43 AS builder
+FROM quay.io/fedora/fedora-bootc:44 AS builder
 
 ARG KUBE_MINOR=1.35
 # Pin kernel to 6.19.x to work around a kernel 7.0 regression.
 # https://github.com/alicefr/bink/issues/52
-ARG KERNEL_VERSION=6.19.14-200.fc43
+ARG KERNEL_VERSION=6.19.14-300.fc44
 RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --manifest=minimal \
     --no-docs \

@@ -1,7 +1,7 @@
 .PHONY: build-bootc-image build-disk-image clean help
 
 KUBE_MINOR ?= 1.35
-FEDORA_VERSION ?= 43
+FEDORA_VERSION ?= 44
 DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G
 
