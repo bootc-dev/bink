@@ -8,7 +8,6 @@ RUN dnf install -y --setopt=install_weak_deps=0 \
 	libvirt-daemon-driver-storage-core \
 	libvirt-daemon-driver-network \
 	qemu-kvm \
-	virt-install \
 	virtiofsd \
 	passt \
 	iputils \

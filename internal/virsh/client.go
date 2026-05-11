@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/sirupsen/logrus"
+	libvirt "libvirt.org/go/libvirt"
 )
 
 type Client struct {
 	containerName string
 	podmanClient  *podman.Client
+	libvirtURI    string
+	conn          *libvirt.Connect
 }
 
 func NewClient(containerName string, podmanClient *podman.Client) *Client {
@@ -21,76 +25,97 @@ func NewClient(containerName string, podmanClient *podman.Client) *Client {
 	}
 }
 
-func (c *Client) ExecInContainer(ctx context.Context, args ...string) (string, error) {
-	return c.podmanClient.ContainerExec(ctx, c.containerName, args)
+func (c *Client) SetLibvirtURI(uri string) {
+	c.libvirtURI = uri
 }
 
-func (c *Client) VirtInstall(ctx context.Context, opts *VirtInstallOptions) error {
-	var memArg string
-	if opts.MaxMemory > 0 && opts.MaxMemory > opts.Memory {
-		memArg = fmt.Sprintf("memory=%d,currentMemory=%d", opts.MaxMemory, opts.Memory)
-	} else {
-		memArg = fmt.Sprintf("%d", opts.Memory)
-	}
-
-	args := []string{
-		"virt-install",
-		"--connect", "qemu:///session",
-		"--name", opts.Name,
-		"--memory", memArg,
-		"--vcpus", fmt.Sprintf("%d", opts.VCPUs),
-		"--import",
-		"--os-variant", "fedora-unknown",
-		"--graphics", "none",
-		"--console", "pty,target_type=serial",
-		"--noautoconsole",
-	}
-
-	// Add shared memory support if filesystems are present (required for virtiofs)
-	if len(opts.Filesystems) > 0 {
-		args = append(args, "--memorybacking", "source.type=memfd,access.mode=shared")
-	}
-
-	for _, disk := range opts.Disks {
-		args = append(args, "--disk", disk)
-	}
-
-	for _, network := range opts.Networks {
-		netArg := network.Type
-		if network.Model != "" {
-			netArg += fmt.Sprintf(",model=%s", network.Model)
+func (c *Client) connect(ctx context.Context) error {
+	if c.conn != nil {
+		alive, err := c.conn.IsAlive()
+		if err == nil && alive {
+			return nil
 		}
-		if network.MAC != "" {
-			netArg += fmt.Sprintf(",mac=%s", network.MAC)
+		if _, err := c.conn.Close(); err != nil {
+			logrus.Debugf("Closing stale libvirt connection: %v", err)
 		}
-		if network.PortForward != "" {
-			netArg += fmt.Sprintf(",portForward=%s", network.PortForward)
-		}
-		args = append(args, "--network", netArg)
+		c.conn = nil
 	}
 
-	for _, fs := range opts.Filesystems {
-		// Build filesystem argument for virt-install
-		// Explicitly specify virtiofs driver
-		fsArg := fmt.Sprintf("source.dir=%s,target.dir=%s,driver.type=virtiofs",
-			fs.Source, fs.Target)
+	if c.libvirtURI == "" {
+		return fmt.Errorf("libvirt URI not set")
+	}
 
-		if fs.ReadOnly {
-			fsArg += ",readonly=on"
+	var lastErr error
+	backoff := 500 * time.Millisecond
+	deadline := time.Now().Add(30 * time.Second)
+
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 
-		args = append(args, "--filesystem", fsArg)
+		conn, err := libvirt.NewConnect(c.libvirtURI)
+		if err == nil {
+			c.conn = conn
+			logrus.Debugf("Connected to libvirt at %s", c.libvirtURI)
+			return nil
+		}
+		lastErr = err
+		logrus.Debugf("Retrying libvirt connection to %s: %v", c.libvirtURI, err)
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
+		if backoff < 5*time.Second {
+			backoff *= 2
+		}
 	}
 
-	for _, xml := range opts.XMLModifications {
-		args = append(args, "--xml", xml)
+	return fmt.Errorf("connecting to libvirt at %s after 30s: %w", c.libvirtURI, lastErr)
+}
+
+func (c *Client) Close() error {
+	if c.conn != nil {
+		_, err := c.conn.Close()
+		c.conn = nil
+		return err
+	}
+	return nil
+}
+
+func (c *Client) DefineAndStartDomain(ctx context.Context, opts ...DomainOption) error {
+	if err := c.connect(ctx); err != nil {
+		return fmt.Errorf("connecting to libvirt: %w", err)
 	}
 
-	args = append(args, "--channel", "unix,target.type=virtio,target.name=org.qemu.guest_agent.0")
+	xmlStr, err := MarshalDomainXML(opts...)
+	if err != nil {
+		return fmt.Errorf("building domain XML: %w", err)
+	}
 
-	logrus.Debugf("Creating VM with virt-install: %s", strings.Join(args, " "))
+	logrus.Debugf("Defining domain with XML:\n%s", xmlStr)
 
-	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
+	dom, err := c.conn.DomainDefineXML(xmlStr)
+	if err != nil {
+		return fmt.Errorf("defining domain: %w", err)
+	}
+	defer dom.Free()
+
+	if err := dom.Create(); err != nil {
+		return fmt.Errorf("starting domain: %w", err)
+	}
+
+	domain := NewDomain(opts...)
+	logrus.Infof("Domain %s defined and started via libvirt", domain.Name)
+	return nil
+}
+
+func (c *Client) ExecInContainer(ctx context.Context, args ...string) (string, error) {
+	return c.podmanClient.ContainerExec(ctx, c.containerName, args)
 }
 
 func (c *Client) QemuImgCreate(ctx context.Context, opts *QemuImgCreateOptions) error {
@@ -129,4 +154,3 @@ func (c *Client) Genisoimage(ctx context.Context, outputPath, volumeID string, f
 
 	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
 }
-

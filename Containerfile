@@ -9,6 +9,7 @@ RUN dnf install -y \
     gpgme-devel \
     btrfs-progs-devel \
     device-mapper-devel \
+    libvirt-devel \
     && dnf clean all
 
 WORKDIR /build

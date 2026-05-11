@@ -37,6 +37,7 @@ const (
 	ClusterMACPrefix   = "52:54:01"
 
 	DefaultAPIServerPort = 6443
+	LibvirtTCPPort       = 16509
 	ServiceCIDR          = "10.96.0.0/12"
 
 	CalicoVersion        = "v3.27.0"

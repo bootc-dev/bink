@@ -167,6 +167,12 @@ func (n *Node) Create(ctx context.Context) error {
 		return fmt.Errorf("creating container: %w", err)
 	}
 
+	libvirtPort, err := n.podman.GetPublishedPort(ctx, n.ContainerName, fmt.Sprintf("%d/tcp", config.LibvirtTCPPort))
+	if err != nil {
+		return fmt.Errorf("getting libvirt TCP port: %w", err)
+	}
+	n.virsh.SetLibvirtURI(fmt.Sprintf("qemu+tcp://localhost:%d/session", libvirtPort))
+
 	if err := n.setupSSHKeys(ctx); err != nil {
 		return fmt.Errorf("setting up SSH keys: %w", err)
 	}

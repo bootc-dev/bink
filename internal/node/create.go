@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -74,16 +73,21 @@ func (n *Node) createContainer(ctx context.Context) error {
 		},
 		CapAdd:      []string{"SYS_ADMIN"},
 		SelinuxOpts: []string{"disable"},
+		PortMappings: []nettypes.PortMapping{
+			{
+				HostPort:      0,
+				ContainerPort: uint16(config.LibvirtTCPPort),
+				Protocol:      "tcp",
+			},
+		},
 	}
 
 	if n.IsControlPlane {
-		opts.PortMappings = []nettypes.PortMapping{
-			{
-				HostPort:      uint16(n.APIPort),
-				ContainerPort: 6443,
-				Protocol:      "tcp",
-			},
-		}
+		opts.PortMappings = append(opts.PortMappings, nettypes.PortMapping{
+			HostPort:      uint16(n.APIPort),
+			ContainerPort: 6443,
+			Protocol:      "tcp",
+		})
 	}
 
 	containerID, err := n.podman.ContainerCreate(ctx, opts)
@@ -174,89 +178,41 @@ func (n *Node) createOverlayDisk(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) waitForVirtqemud(ctx context.Context) error {
-	logrus.Debug("Waiting for virtqemud socket...")
-	for i := range 30 {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		err := n.podman.ContainerExecQuiet(ctx, n.ContainerName,
-			[]string{"test", "-S", "/var/run/libvirt/virtqemud-sock"})
-		if err == nil {
-			logrus.Debug("virtqemud socket is ready")
-			return nil
-		}
-		if i == 29 {
-			return fmt.Errorf("virtqemud socket not ready after 30s")
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(time.Second):
-		}
-	}
-	return nil
-}
 
 func (n *Node) createVM(ctx context.Context) error {
 	logrus.Infof("Creating VM %s", n.Name)
 
-	if err := n.waitForVirtqemud(ctx); err != nil {
-		return err
+	if n.Memory <= 0 || n.VCPUs <= 0 {
+		return fmt.Errorf("invalid VM configuration: memory=%d vcpus=%d (both must be positive)", n.Memory, n.VCPUs)
 	}
 
-	overlayDisk := fmt.Sprintf("path=/workspace/%s.qcow2,format=qcow2,bus=virtio", n.Name)
-	isoPath := fmt.Sprintf("path=/workspace/%s-cloud-init.iso,device=cdrom", n.Name)
-
-	maxMemory := n.MaxMemory
-	if maxMemory == 0 {
-		maxMemory = n.Memory
+	portForwards := []virsh.PortForward{
+		{Start: 2222, To: 22},
 	}
-
-	opts := &virsh.VirtInstallOptions{
-		Name:      n.Name,
-		Memory:    n.Memory,
-		MaxMemory: maxMemory,
-		VCPUs:     n.VCPUs,
-		Disks:  []string{overlayDisk, isoPath},
-		Networks: []virsh.NetworkConfig{
-			{
-				Type:        "passt",
-				Model:       "virtio",
-				PortForward: "2222:22",
-			},
-			{
-				Type:  "mcast",
-				Model: "virtio",
-				MAC:   n.ClusterMAC,
-			},
-		},
-		Filesystems: []virsh.FilesystemConfig{
-			{
-				Source:     config.VirtiofsSharedDir,
-				Target:     "cluster_images",
-				AccessMode: "passthrough",
-				ReadOnly:   false,
-			},
-		},
-		XMLModifications: []string{
-			"xpath.set=./devices/interface[2]/source/@address=" + config.MulticastAddr,
-			fmt.Sprintf("xpath.set=./devices/interface[2]/source/@port=%d", config.MulticastPort),
-			"xpath.set=./devices/filesystem/source/@socket=" + config.VirtiofsSocketPath,
-		},
-	}
-
 	if n.IsControlPlane {
-		opts.XMLModifications = append(opts.XMLModifications,
-			"xpath.create=./devices/interface[1]/portForward/range",
-			"xpath.set=./devices/interface[1]/portForward/range[2]/@start=6443",
-			"xpath.set=./devices/interface[1]/portForward/range[2]/@to=6443",
-		)
+		portForwards = append(portForwards, virsh.PortForward{Start: 6443, To: 6443})
 	}
 
-	if err := n.virsh.VirtInstall(ctx, opts); err != nil {
-		return fmt.Errorf("creating VM with virt-install: %w", err)
+	opts := []virsh.DomainOption{
+		virsh.WithKVM(),
+		virsh.WithName(n.Name),
+		virsh.WithMemory(uint(n.Memory)),
+		virsh.WithVCPUs(uint(n.VCPUs)),
+		virsh.WithQ35OS(),
+		virsh.WithFeatures(),
+		virsh.WithCPUHostPassthrough(),
+		virsh.WithMemoryBackingForVirtiofs(),
+		virsh.WithDisk(fmt.Sprintf("/workspace/%s.qcow2", n.Name), "qcow2", "vda", "virtio"),
+		virsh.WithCDROM(fmt.Sprintf("/workspace/%s-cloud-init.iso", n.Name)),
+		virsh.WithPasstInterface(portForwards),
+		virsh.WithMcastInterface(n.ClusterMAC, config.MulticastAddr, config.MulticastPort),
+		virsh.WithVirtiofsSocket(config.VirtiofsSocketPath, "cluster_images"),
+		virsh.WithSerialConsole(),
+		virsh.WithGuestAgent(),
+	}
+
+	if err := n.virsh.DefineAndStartDomain(ctx, opts...); err != nil {
+		return fmt.Errorf("creating VM: %w", err)
 	}
 
 	logrus.Infof("VM %s created with dual-NIC networking", n.Name)
