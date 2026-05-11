@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -175,8 +176,37 @@ func (n *Node) createOverlayDisk(ctx context.Context) error {
 	return nil
 }
 
+func (n *Node) waitForVirtqemud(ctx context.Context) error {
+	logrus.Debug("Waiting for virtqemud socket...")
+	for i := range 30 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		err := n.podman.ContainerExecQuiet(ctx, n.ContainerName,
+			[]string{"test", "-S", "/var/run/libvirt/virtqemud-sock"})
+		if err == nil {
+			logrus.Debug("virtqemud socket is ready")
+			return nil
+		}
+		if i == 29 {
+			return fmt.Errorf("virtqemud socket not ready after 30s")
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+	return nil
+}
+
 func (n *Node) createVM(ctx context.Context) error {
 	logrus.Infof("Creating VM %s", n.Name)
+
+	if err := n.waitForVirtqemud(ctx); err != nil {
+		return err
+	}
 
 	overlayDisk := fmt.Sprintf("path=/workspace/%s.qcow2,format=qcow2,bus=virtio", n.Name)
 	isoPath := fmt.Sprintf("path=/workspace/%s-cloud-init.iso,device=cdrom", n.Name)
