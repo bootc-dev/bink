@@ -1,9 +1,16 @@
 FROM quay.io/fedora/fedora-bootc:43 AS builder
 
 ARG KUBE_MINOR=1.35
+# Pin kernel to 6.19.x to work around a kernel 7.0 regression.
+# https://github.com/alicefr/bink/issues/52
+ARG KERNEL_VERSION=6.19.14-200.fc43
 RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --manifest=minimal \
     --no-docs \
+    --lock kernel-${KERNEL_VERSION} \
+    --lock kernel-core-${KERNEL_VERSION} \
+    --lock kernel-modules-${KERNEL_VERSION} \
+    --lock kernel-modules-core-${KERNEL_VERSION} \
     --install NetworkManager \
     --install openssh-server \
     --install openssh-clients \
