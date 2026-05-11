@@ -37,6 +37,40 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 		return fmt.Errorf("creating registry volume: %w", err)
 	}
 
+	exists, err := m.podman.ContainerExists(ctx, config.RegistryContainerName)
+	if err != nil {
+		return fmt.Errorf("checking registry container: %w", err)
+	}
+
+	if exists {
+		status, err := m.podman.ContainerStatus(ctx, config.RegistryContainerName)
+		if err != nil {
+			return fmt.Errorf("checking registry status: %w", err)
+		}
+		switch status {
+		case define.ContainerStateRunning.String():
+			logrus.Info("Registry already running")
+			return nil
+		default:
+			logrus.Infof("Registry container is %s, starting it", status)
+			if err := m.podman.ContainerStart(ctx, config.RegistryContainerName); err != nil {
+				return fmt.Errorf("starting registry: %w", err)
+			}
+			logrus.Info("Registry started")
+			return nil
+		}
+	}
+
+	if err := m.createContainer(ctx); err != nil {
+		return err
+	}
+
+	logrus.Infof("Registry running at %s:%d (host: localhost:%d)",
+		config.RegistryStaticIP, config.RegistryPort, config.RegistryPort)
+	return nil
+}
+
+func (m *Manager) createContainer(ctx context.Context) error {
 	opts := &podman.ContainerCreateOptions{
 		Name:  config.RegistryContainerName,
 		Image: config.RegistryImage,
@@ -65,31 +99,13 @@ func (m *Manager) EnsureRegistry(ctx context.Context) error {
 	}
 
 	_, err := m.podman.ContainerCreate(ctx, opts)
-	if err == nil {
-		logrus.Infof("Registry running at %s:%d (host: localhost:%d)",
-			config.RegistryStaticIP, config.RegistryPort, config.RegistryPort)
-		return nil
-	}
-
-	if !strings.Contains(err.Error(), "already in use") {
+	if err != nil {
+		if strings.Contains(err.Error(), "already in use") {
+			logrus.Info("Registry container was created concurrently")
+			return nil
+		}
 		return fmt.Errorf("creating registry container: %w", err)
 	}
-
-	logrus.Info("Registry container already exists, verifying it is running")
-	status, err := m.podman.ContainerStatus(ctx, config.RegistryContainerName)
-	if err != nil {
-		return fmt.Errorf("checking registry status: %w", err)
-	}
-	if status == define.ContainerStateRunning.String() {
-		logrus.Info("Registry already running")
-		return nil
-	}
-
-	logrus.Infof("Registry container is %s, starting it", status)
-	if err := m.podman.ContainerStart(ctx, config.RegistryContainerName); err != nil {
-		return fmt.Errorf("starting registry: %w", err)
-	}
-	logrus.Info("Registry started")
 	return nil
 }
 
