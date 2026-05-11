@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'containerfiles/vm/**'
+      - 'containerfiles/cluster-image/**'
   pull_request:
     paths:
-      - 'containerfiles/vm/**'
+      - 'containerfiles/cluster-image/**'
   workflow_dispatch:
     inputs:
       push:
