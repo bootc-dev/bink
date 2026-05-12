@@ -30,8 +30,8 @@ var _ = Describe("Cluster Lifecycle", func() {
 		})
 
 		It("should create and initialize a complete Kubernetes cluster", func() {
-			By("Creating cluster with auto-assigned API port and 4GB memory")
-			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "4096")
+			By("Creating cluster with auto-assigned API port and memory ballooning")
+			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096")
 			session := helpers.RunCommand(cmd)
 
 			By("Verifying cluster creation command succeeded")

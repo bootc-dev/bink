@@ -80,8 +80,17 @@ jobs:
           df -h /
           free -h
 
+      - name: Pre-pull container images
+        run: |
+          sudo podman pull ghcr.io/alicefr/bink/cluster:latest
+          sudo podman pull ghcr.io/alicefr/bink/node:v1.35-fedora-43-disk
+          sudo podman pull ghcr.io/alicefr/bink/dns:latest
+          sudo podman pull docker.io/library/registry:2
+          sudo podman pull docker.io/library/haproxy:lts-alpine
+          sudo podman pull quay.io/libpod/busybox:latest
+
       - name: Run integration tests
-        run: sudo make test-integration TEST_PROCS=2
+        run: sudo make test-integration TEST_PROCS=3
         timeout-minutes: 90
         env:
           CONTAINER_HOST: unix:///run/podman/podman.sock

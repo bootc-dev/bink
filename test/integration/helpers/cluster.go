@@ -42,7 +42,7 @@ func RunCommand(cmd *exec.Cmd, timeout ...time.Duration) *gexec.Session {
 // Uses auto-assigned ports (--api-port 0) to avoid port conflicts in tests
 func CreateCluster(name string) {
 	GinkgoWriter.Printf("Creating cluster: %s (with auto-assigned API port)\n", name)
-	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0")
+	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0", "--memory", "1900", "--max-memory", "4096")
 	session := RunCommand(cmd, 10*time.Minute)
 	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
 }
@@ -52,6 +52,21 @@ func AddNode(clusterName, nodeName string, extraArgs ...string) {
 	GinkgoWriter.Printf("Adding node %s to cluster %s\n", nodeName, clusterName)
 	args := []string{"node", "add", nodeName, "--cluster-name", clusterName}
 	args = append(args, extraArgs...)
+
+	// Use lower memory for worker nodes since they don't run control plane components
+	isControlPlane := false
+	for _, arg := range extraArgs {
+		if arg == "control-plane" {
+			isControlPlane = true
+			break
+		}
+	}
+	if isControlPlane {
+		args = append(args, "--memory", "1900", "--max-memory", "4096")
+	} else {
+		args = append(args, "--memory", "1024", "--max-memory", "2048")
+	}
+
 	cmd := BinkCmd(args...)
 	session := RunCommand(cmd, 10*time.Minute)
 	Expect(session.ExitCode()).To(Equal(0), "Failed to add node: %s", string(session.Err.Contents()))

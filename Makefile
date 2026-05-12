@@ -67,7 +67,7 @@ update-calico:
 
 # Test targets
 GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
-TEST_PROCS ?= 2
+TEST_PROCS ?= 3
 GINKGO_FOCUS ?=
 GINKGO_FOCUS_FLAG := $(if $(GINKGO_FOCUS),--focus="$(GINKGO_FOCUS)",)
 
