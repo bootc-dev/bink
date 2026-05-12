@@ -14,7 +14,7 @@ import (
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
 
-var _ = Describe("HAProxy Load Balancer", func() {
+var _ = Describe("HAProxy Load Balancer", Serial, func() {
 	const (
 		node1 = "node1"
 		node2 = "node2"
