@@ -164,7 +164,7 @@ func (c *Cluster) newKubeClient(ctx context.Context, sshClient *ssh.Client, cont
 
 // waitForCalicoCNI polls the VM until Calico's CNI config file appears in /etc/cni/net.d.
 func (c *Cluster) waitForCalicoCNI(ctx context.Context, sshClient *ssh.Client) error {
-	deadline := time.After(2 * time.Minute)
+	deadline := time.After(4 * time.Minute)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
