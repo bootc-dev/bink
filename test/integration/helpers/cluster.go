@@ -64,7 +64,7 @@ func AddNode(clusterName, nodeName string, extraArgs ...string) {
 	if isControlPlane {
 		args = append(args, "--memory", "1900", "--max-memory", "4096")
 	} else {
-		args = append(args, "--memory", "1024", "--max-memory", "2048")
+		args = append(args, "--memory", "768", "--max-memory", "2048")
 	}
 
 	cmd := BinkCmd(args...)
