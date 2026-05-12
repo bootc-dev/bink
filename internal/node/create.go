@@ -208,10 +208,16 @@ func (n *Node) createVM(ctx context.Context) error {
 	overlayDisk := fmt.Sprintf("path=/workspace/%s.qcow2,format=qcow2,bus=virtio", n.Name)
 	isoPath := fmt.Sprintf("path=/workspace/%s-cloud-init.iso,device=cdrom", n.Name)
 
+	maxMemory := n.MaxMemory
+	if maxMemory == 0 {
+		maxMemory = n.Memory
+	}
+
 	opts := &virsh.VirtInstallOptions{
-		Name:   n.Name,
-		Memory: n.Memory,
-		VCPUs:  n.VCPUs,
+		Name:      n.Name,
+		Memory:    n.Memory,
+		MaxMemory: maxMemory,
+		VCPUs:     n.VCPUs,
 		Disks:  []string{overlayDisk, isoPath},
 		Networks: []virsh.NetworkConfig{
 			{

@@ -26,11 +26,18 @@ func (c *Client) ExecInContainer(ctx context.Context, args ...string) (string, e
 }
 
 func (c *Client) VirtInstall(ctx context.Context, opts *VirtInstallOptions) error {
+	var memArg string
+	if opts.MaxMemory > 0 && opts.MaxMemory > opts.Memory {
+		memArg = fmt.Sprintf("memory=%d,currentMemory=%d", opts.MaxMemory, opts.Memory)
+	} else {
+		memArg = fmt.Sprintf("%d", opts.Memory)
+	}
+
 	args := []string{
 		"virt-install",
 		"--connect", "qemu:///session",
 		"--name", opts.Name,
-		"--memory", fmt.Sprintf("%d", opts.Memory),
+		"--memory", memArg,
 		"--vcpus", fmt.Sprintf("%d", opts.VCPUs),
 		"--import",
 		"--os-variant", "fedora-unknown",

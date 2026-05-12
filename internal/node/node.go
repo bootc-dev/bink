@@ -19,6 +19,7 @@ type Node struct {
 	DNSIP               string
 	IsControlPlane      bool
 	Memory              int
+	MaxMemory           int
 	VCPUs               int
 	BaseDisk            string
 	NodeImage           string
@@ -56,7 +57,18 @@ func WithAPIPort(port int) NodeOption {
 
 func WithMemory(memory int) NodeOption {
 	return func(n *Node) error {
-		n.Memory = memory
+		if memory > 0 {
+			n.Memory = memory
+		}
+		return nil
+	}
+}
+
+func WithMaxMemory(maxMemory int) NodeOption {
+	return func(n *Node) error {
+		if maxMemory > 0 {
+			n.MaxMemory = maxMemory
+		}
 		return nil
 	}
 }

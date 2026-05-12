@@ -21,6 +21,7 @@ func newAddCmd() *cobra.Command {
 	var nodeImage string
 	var role string
 	var memory int
+	var maxMemory int
 
 	cmd := &cobra.Command{
 		Use:   "add <node-name>",
@@ -29,7 +30,7 @@ func newAddCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, logger)
+			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, logger)
 		},
 	}
 
@@ -37,11 +38,12 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().StringVarP(&role, "role", "r", "worker", "Node role: worker or control-plane")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 2048 MB)")
+	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = same as --memory)")
 
 	return cmd
 }
 
-func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, logger *logrus.Logger) error {
+func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, maxMemory int, logger *logrus.Logger) error {
 	// Validate and convert role to boolean
 	var isControlPlane bool
 	switch role {
@@ -111,6 +113,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		node.WithNodeImage(nodeImage),
 		node.WithClusterName(clusterName),
 		node.WithMemory(memory),
+		node.WithMaxMemory(maxMemory),
 		node.WithUsedIPs(usedIPs),
 		node.WithDNSIP(dnsIP),
 		node.WithClusterImagesVolume(clusterImagesVolume),
