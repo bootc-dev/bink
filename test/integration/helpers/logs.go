@@ -41,6 +41,10 @@ func CollectFailureLogs(clusterNames ...string) {
 			continue
 		}
 		for _, ctr := range containers {
+			nodeName, _ := podmanClient.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.node-name"}}`)
+			if nodeName == "" {
+				continue
+			}
 			collectContainerLogs(ctx, podmanClient, testDir, ctr)
 		}
 	}
