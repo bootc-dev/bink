@@ -22,6 +22,7 @@ var _ = Describe("Local Registry", func() {
 	})
 
 	AfterEach(func() {
+		helpers.CollectFailureLogs(clusterName)
 		helpers.CleanupCluster(clusterName)
 	})
 

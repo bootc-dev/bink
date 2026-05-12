@@ -28,6 +28,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 	})
 
 	AfterEach(func() {
+		helpers.CollectFailureLogs(clusterName)
 		helpers.CleanupCluster(clusterName)
 	})
 

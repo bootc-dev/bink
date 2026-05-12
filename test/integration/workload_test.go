@@ -19,6 +19,7 @@ var _ = Describe("Kubernetes Workloads", func() {
 	})
 
 	AfterEach(func() {
+		helpers.CollectFailureLogs(clusterName)
 		helpers.CleanupCluster(clusterName)
 	})
 

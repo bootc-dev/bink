@@ -19,6 +19,7 @@ var _ = Describe("Multi-Cluster Operations", func() {
 	})
 
 	AfterEach(func() {
+		helpers.CollectFailureLogs(clusterNameA, clusterNameB)
 		helpers.CleanupCluster(clusterNameA)
 		helpers.CleanupCluster(clusterNameB)
 	})

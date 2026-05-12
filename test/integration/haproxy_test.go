@@ -28,6 +28,7 @@ var _ = Describe("HAProxy Load Balancer", func() {
 	})
 
 	AfterEach(func() {
+		helpers.CollectFailureLogs(clusterName)
 		helpers.CleanupCluster(clusterName)
 	})
 

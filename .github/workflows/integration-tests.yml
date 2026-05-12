@@ -86,13 +86,6 @@ jobs:
         env:
           CONTAINER_HOST: unix:///run/podman/podman.sock
 
-      - name: Cleanup test clusters
-        if: always()
-        run: |
-          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
-            xargs -r sudo podman rm -f 2>/dev/null || true
-          sudo podman volume prune -f 2>/dev/null || true
-
       - name: Collect logs
         if: failure()
         run: .github/collect-logs.sh
@@ -103,3 +96,10 @@ jobs:
         with:
           name: test-logs
           path: /tmp/bink-logs/
+
+      - name: Cleanup test clusters
+        if: always()
+        run: |
+          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r sudo podman rm -f 2>/dev/null || true
+          sudo podman volume prune -f 2>/dev/null || true
