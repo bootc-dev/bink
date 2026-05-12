@@ -119,7 +119,7 @@ var _ = Describe("Multi-Node Clusters", func() {
 		Expect(helpers.GetNodeCount(kubeClient)).To(Equal(3))
 	})
 
-	It("should add control-plane nodes for HA configuration", func() {
+	It("should add control-plane nodes for HA configuration", Serial, func() {
 		By("Creating a single-node cluster")
 		helpers.CreateCluster(clusterName)
 

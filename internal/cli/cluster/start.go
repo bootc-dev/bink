@@ -21,6 +21,7 @@ func newStartCmd() *cobra.Command {
 	var nodeImage string
 	var apiPort int
 	var memory int
+	var maxMemory int
 
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -28,18 +29,19 @@ func newStartCmd() *cobra.Command {
 		Long:  "Create network, control plane node, and initialize Kubernetes cluster with kubeadm",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, nodeImage, apiPort, memory)
+			return runStart(cmd.Context(), logger, nodeImage, apiPort, memory, maxMemory)
 		},
 	}
 
 	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().IntVar(&apiPort, "api-port", 0, "API server port to expose (0 = auto-assign random port)")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 2048 MB)")
+	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = same as --memory)")
 
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiPort int, memory int) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiPort int, memory int, maxMemory int) error {
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -116,6 +118,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		node.WithClusterName(clusterName),
 		node.WithAPIPort(apiPort),
 		node.WithMemory(memory),
+		node.WithMaxMemory(maxMemory),
 		node.WithDNSIP(dnsIP),
 		node.WithClusterImagesVolume(clusterImagesVolume),
 	)

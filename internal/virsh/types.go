@@ -3,6 +3,7 @@ package virsh
 type VirtInstallOptions struct {
 	Name             string
 	Memory           int
+	MaxMemory        int
 	VCPUs            int
 	Disks            []string
 	Networks         []NetworkConfig
