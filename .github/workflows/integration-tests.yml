@@ -83,7 +83,7 @@ jobs:
       - name: Pre-pull container images
         run: |
           sudo podman pull ghcr.io/alicefr/bink/cluster:latest
-          sudo podman pull ghcr.io/alicefr/bink/node:v1.35-fedora-43-disk
+          sudo podman pull ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk
           sudo podman pull ghcr.io/alicefr/bink/dns:latest
           sudo podman pull docker.io/library/registry:2
           sudo podman pull docker.io/library/haproxy:lts-alpine
