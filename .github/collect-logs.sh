@@ -27,9 +27,9 @@ for ctr in $(sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}
   ssh_vm "$ctr" "sudo dmesg" > "$dir/dmesg.log" || true
 done
 
-df -h > "$LOG_DIR/disk.txt"
-free -h > "$LOG_DIR/memory.txt"
-sudo dmesg | tail -100 > "$LOG_DIR/host-dmesg.txt" 2>/dev/null || true
+df -h | sudo tee "$LOG_DIR/disk.txt" > /dev/null || true
+free -h | sudo tee "$LOG_DIR/memory.txt" > /dev/null || true
+sudo dmesg | tail -100 | sudo tee "$LOG_DIR/host-dmesg.txt" > /dev/null || true
 
 echo "Logs collected in $LOG_DIR"
 ls -R "$LOG_DIR"
