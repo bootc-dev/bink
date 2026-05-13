@@ -30,12 +30,13 @@ FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION}
 
 RUN dnf install -y \
     gpgme \
+    podman \
+    kubernetes-client \
     && dnf clean all
 
 COPY --from=builder /output/bink /usr/local/bin/bink
+COPY containerfiles/bink/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 WORKDIR /output
 
-ENV CONTAINER_HOST=unix:///run/podman/podman.sock
-
-ENTRYPOINT ["/usr/local/bin/bink"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -30,6 +30,7 @@ Instead of building the binary locally, you can run bink directly from a contain
 # Start a cluster (mount host Podman socket)
 podman run --rm -ti --network=host --security-opt label=disable \
   -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
+  -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v $(pwd):/output \
   ghcr.io/alicefr/bink/bink:latest \
   cluster start
@@ -37,6 +38,7 @@ podman run --rm -ti --network=host --security-opt label=disable \
 # Expose the API (kubeconfig is written to the mounted directory)
 podman run --rm -ti --network=host --security-opt label=disable \
   -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
+  -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v $(pwd):/output \
   ghcr.io/alicefr/bink/bink:latest \
   api expose
@@ -46,11 +48,44 @@ For convenience, create a shell alias:
 ```bash
 alias bink='podman run --rm -ti --network=host --security-opt label=disable \
   -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
+  -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v $(pwd):/output \
   ghcr.io/alicefr/bink/bink:latest'
 ```
 
 Then use it like the native binary: `bink cluster start`, `bink api expose`, etc.
+
+### Nested containerization (no socket mount)
+
+If you don't want to mount the host podman socket, bink can run podman inside the container. The container starts a podman service and all bink commands are run via `podman exec`:
+
+```bash
+# Start the bink container (runs podman service in the background)
+podman run -d --name bink --privileged \
+  --device /dev/kvm \
+  -v bink-storage:/var/lib/containers \
+  -v $(pwd):/output \
+  ghcr.io/alicefr/bink/bink:latest
+
+# Wait for podman service to be ready inside the container
+until podman exec bink podman info &>/dev/null; do sleep 0.5; done
+
+# Run bink commands
+podman exec bink bink cluster start
+podman exec bink bink api expose
+podman exec bink bink cluster list
+
+# Use kubectl from inside the bink container
+podman exec bink kubectl --kubeconfig /output/kubeconfig-podman get nodes
+
+# Stop and remove when done
+podman exec bink bink cluster stop --remove-data
+podman rm -f bink
+```
+
+The `bink-storage` volume persists container images across runs so they don't need to be re-downloaded each time.
+
+**Note:** In nested mode the cluster and its API ports live inside the bink container. Use `kubectl` from inside the container, or use the socket-mount mode for host-level access.
 
 ## Create a Cluster
 
