@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,11 @@ import (
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	ErrImageInspect          = errors.New("inspecting node image")
+	ErrKubeadmVersionUnknown = errors.New("cannot determine kubeadm version")
 )
 
 const (
@@ -33,7 +39,7 @@ func ClusterImagesVolumeName(kubeadmVersion string) string {
 }
 
 // GetKubeadmVersionFromImage inspects the node image and returns the kubeadm version from its label.
-func GetKubeadmVersionFromImage(ctx context.Context, podmanClient *podman.Client, nodeImage string) (string, error) {
+func GetKubeadmVersionFromImage(ctx context.Context, podmanClient PodmanClient, nodeImage string) (string, error) {
 	labels, err := podmanClient.ImageInspectLabels(ctx, nodeImage)
 	switch {
 	case err == nil:
@@ -43,14 +49,14 @@ func GetKubeadmVersionFromImage(ctx context.Context, podmanClient *podman.Client
 	case isImageNotFound(err):
 		logrus.Debugf("Image %s not available locally, falling back to tag parsing", nodeImage)
 	default:
-		return "", fmt.Errorf("inspecting node image %s: %w", nodeImage, err)
+		return "", fmt.Errorf("%w %s: %w", ErrImageInspect, nodeImage, err)
 	}
 
 	if version := extractVersionFromTag(nodeImage); version != "" {
 		return version, nil
 	}
 
-	return "", fmt.Errorf("cannot determine kubeadm version from node image %s: label %q not found and version cannot be inferred from the tag", nodeImage, kubeadmVersionLabelKey)
+	return "", fmt.Errorf("%w from node image %s: label %q not found and version cannot be inferred from the tag", ErrKubeadmVersionUnknown, nodeImage, kubeadmVersionLabelKey)
 }
 
 func isImageNotFound(err error) bool {

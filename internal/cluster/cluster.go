@@ -12,12 +12,27 @@ import (
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
+type PodmanClient interface {
+	EnsureImage(ctx context.Context, image string) error
+	ImageInspectLabels(ctx context.Context, name string) (map[string]string, error)
+	VolumeExists(ctx context.Context, name string) (bool, error)
+	VolumeCreate(ctx context.Context, name string, labels map[string]string) error
+	ContainerCreate(ctx context.Context, opts *podman.ContainerCreateOptions) (string, error)
+	ContainerExists(ctx context.Context, name string) (bool, error)
+	ContainerRemove(ctx context.Context, name string, force bool) error
+	ContainerExec(ctx context.Context, name string, cmd []string) (string, error)
+	ContainerExecQuiet(ctx context.Context, name string, cmd []string) error
+	ContainerRunQuiet(ctx context.Context, image string, cmd []string, volumeMounts []string) error
+	ContainerWait(ctx context.Context, name string) (int64, error)
+	GetPublishedPort(ctx context.Context, containerName, containerPort string) (int, error)
+}
+
 // Cluster represents a Kubernetes cluster
 type Cluster struct {
 	name         string
 	controlPlane string
 	logger       *logrus.Logger
-	podmanClient *podman.Client
+	podmanClient PodmanClient
 }
 
 // Config holds cluster configuration
@@ -25,6 +40,7 @@ type Config struct {
 	Name         string // Cluster name (default: "bink")
 	ControlPlane string // Control plane node name (default: "node1")
 	Logger       *logrus.Logger
+	PodmanClient PodmanClient
 }
 
 // New creates a new Cluster
@@ -39,16 +55,20 @@ func New(cfg Config) *Cluster {
 		cfg.ControlPlane = "node1"
 	}
 
-	podmanClient, err := podman.NewClient()
-	if err != nil {
-		cfg.Logger.Warnf("Failed to create podman client: %v", err)
+	var client PodmanClient = cfg.PodmanClient
+	if client == nil {
+		c, err := podman.NewClient()
+		if err != nil {
+			cfg.Logger.Warnf("Failed to create podman client: %v", err)
+		}
+		client = c
 	}
 
 	return &Cluster{
 		name:         cfg.Name,
 		controlPlane: cfg.ControlPlane,
 		logger:       cfg.Logger,
-		podmanClient: podmanClient,
+		podmanClient: client,
 	}
 }
 

@@ -28,7 +28,6 @@ const (
 
 	ClusterIPPrefix    = "10.0.0"
 	ClusterIPMinSuffix = 10
-	ClusterIPMaxSuffix = 250
 	ClusterIPRangeSize = 240
 	ClusterSubnet      = "10.0.0.0/24"
 	ClusterMACPrefix   = "52:54:01"
