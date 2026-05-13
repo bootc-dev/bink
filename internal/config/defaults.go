@@ -10,8 +10,11 @@ const (
 	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk"
 
 	DefaultBaseDisk = "/images/disk.qcow2"
-	DefaultMemory   = 2048
-	DefaultVCPUs    = 2
+	DefaultControlPlaneMemory    = 1900
+	DefaultControlPlaneMaxMemory = 4096
+	DefaultWorkerMemory          = 768
+	DefaultWorkerMaxMemory       = 2048
+	DefaultVCPUs                 = 2
 	DefaultDiskSize = "10G"
 
 	DefaultSSHPort      = 2222

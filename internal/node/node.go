@@ -98,11 +98,22 @@ func WithClusterImagesVolume(volumeName string) NodeOption {
 }
 
 func New(name string, isControlPlane bool, opts ...NodeOption) (*Node, error) {
+	var memory, maxMemory int
+	switch {
+	case isControlPlane:
+		memory = config.DefaultControlPlaneMemory
+		maxMemory = config.DefaultControlPlaneMaxMemory
+	default:
+		memory = config.DefaultWorkerMemory
+		maxMemory = config.DefaultWorkerMaxMemory
+	}
+
 	n := &Node{
 		Name:           name,
 		IsControlPlane: isControlPlane,
-		NodeImage:    config.DefaultNodeImage,
-		Memory:         config.DefaultMemory,
+		NodeImage:      config.DefaultNodeImage,
+		Memory:         memory,
+		MaxMemory:      maxMemory,
 		VCPUs:          config.DefaultVCPUs,
 		BaseDisk:       config.DefaultBaseDisk,
 	}

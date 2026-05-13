@@ -37,12 +37,13 @@ make build-images-container   # Wrap qcow2 in a container for image-volume mount
 ### Create a Cluster
 
 ```bash
-./bink cluster start --cluster-name mycluster --api-port 0 --memory 4096
+./bink cluster start --cluster-name mycluster --api-port 0
 ```
 
 - `--cluster-name` names the cluster (default: `podman`). All containers are prefixed `k8s-<cluster>-<node>`.
 - `--api-port 0` auto-assigns a random host port for the Kubernetes API (recommended to avoid conflicts). Use a specific port number to pin it.
-- `--memory` sets VM RAM in MB (default: 2048).
+- `--memory` sets VM RAM in MB (default: 1900 for control-plane, 768 for worker).
+- `--max-memory` sets VM max memory in MB for balloon (default: 4096 for control-plane, 2048 for worker).
 
 This creates container `k8s-mycluster-node1`, initializes kubeadm, installs Calico CNI, and configures CoreDNS.
 
