@@ -1,0 +1,66 @@
+name: Bink usage test
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+
+concurrency:
+  group: container-image-test-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-container-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up KVM
+        run: |
+          sudo chmod 666 /dev/kvm
+          ls -la /dev/kvm
+
+      - name: Configure kernel for nested containers
+        run: |
+          sudo aa-teardown 2>/dev/null || true
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Configure Podman
+        run: |
+          podman --version
+          sudo mkdir -p /etc/containers
+          echo '{"defaultAction":"SCMP_ACT_ALLOW"}' | sudo tee /etc/containers/seccomp.json
+          printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "/etc/containers/seccomp.json"\n' | sudo tee /etc/containers/containers.conf
+          grep -q '^root:' /etc/subuid || echo 'root:100000:65536' | sudo tee -a /etc/subuid
+          grep -q '^root:' /etc/subgid || echo 'root:100000:65536' | sudo tee -a /etc/subgid
+          sudo systemctl start podman.socket
+          sudo podman info --format '{{.Store.GraphRoot}}'
+
+      - name: Build bink image
+        run: sudo make build-bink-image
+
+      - name: Test nested mode
+        run: sudo hack/test-container-image.sh nested
+        timeout-minutes: 40
+
+      - name: Test socket mode
+        run: sudo hack/test-container-image.sh socket
+        timeout-minutes: 15
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
