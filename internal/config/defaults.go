@@ -6,6 +6,7 @@ const (
 
 	FedoraVersion = "43"
 
+	BinkImage           = "ghcr.io/alicefr/bink/bink:latest"
 	DefaultClusterImage = "ghcr.io/alicefr/bink/cluster:latest"
 	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk"
 

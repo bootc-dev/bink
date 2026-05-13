@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os/exec"
 	"text/template"
 	"time"
 
@@ -191,12 +190,10 @@ func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string,
 		return fmt.Errorf("failed to render kubeadm config: %w", err)
 	}
 
-	cmd := fmt.Sprintf("podman exec %s bash -c 'cat > /tmp/kubeadm-config.yaml << \"KUBEADM\"\n%sKUBEADM\n'", containerName, buf.String())
-
-	execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create config: %w: %s", err, string(output))
+	content := buf.String()
+	cmd := []string{"bash", "-c", fmt.Sprintf("cat > /tmp/kubeadm-config.yaml << 'KUBEADM'\n%sKUBEADM\n", content)}
+	if err := c.podmanClient.ContainerExecQuiet(ctx, containerName, cmd); err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
 	}
 
 	return nil

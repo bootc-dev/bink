@@ -22,6 +22,36 @@ go install ./cmd/bink
 
 (We're working on making bink run as a container as well!)
 
+## Running via Container
+
+Instead of building the binary locally, you can run bink directly from a container image:
+
+```bash
+# Start a cluster (mount host Podman socket)
+podman run --rm -ti --network=host --security-opt label=disable \
+  -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
+  -v $(pwd):/output \
+  ghcr.io/alicefr/bink/bink:latest \
+  cluster start
+
+# Expose the API (kubeconfig is written to the mounted directory)
+podman run --rm -ti --network=host --security-opt label=disable \
+  -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
+  -v $(pwd):/output \
+  ghcr.io/alicefr/bink/bink:latest \
+  api expose
+```
+
+For convenience, create a shell alias:
+```bash
+alias bink='podman run --rm -ti --network=host --security-opt label=disable \
+  -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
+  -v $(pwd):/output \
+  ghcr.io/alicefr/bink/bink:latest'
+```
+
+Then use it like the native binary: `bink cluster start`, `bink api expose`, etc.
+
 ## Create a Cluster
 
 ```bash
