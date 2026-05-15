@@ -1,6 +1,12 @@
 # bink
 
-A CLI tool for managing containerized Kubernetes clusters where each node is a Podman container running a VM inside.
+A CLI tool for creating Kubernetes dev clusters from bootc images.
+
+Its primary audience is K8s developers who want a "real enough" Kubernetes
+cluster running on real bootc hosts for hacking and CI. It's easy to use, fast,
+and runs unprivileged. It includes a local OCI registry for sharing images with
+the cluster, networking for seamless cross-node communications, and HAProxy for
+the API server.
 
 ## Prerequisites
 
