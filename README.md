@@ -2,31 +2,34 @@
 
 A CLI tool for managing containerized Kubernetes clusters where each node is a Podman container running a VM inside.
 
-## Compile
+## Prerequisites
+
+Bink uses the Podman client API. Make sure you have a Podman socket (e.g.
+`systemctl --user start podman.socket`) or remote connection available (via
+`CONTAINER_HOST`).
+
+## Installation
 
 ```bash
-make build-bink
+go install ./cmd/bink
 ```
 
-## Build Container Images
-
-```bash
-# Build all images (VM image, disk, and container images)
-make all
-```
+(We're working on making bink run as a container as well!)
 
 ## Create a Cluster
 
 ```bash
 # Create cluster with control plane
-./bink cluster start
-
-# Add worker nodes (optional)
-./bink node add node2
-./bink node add node3
+bink cluster start
 
 # Access the cluster
-export KUBECONFIG=./kubeconfig
+bink api expose
+export KUBECONFIG=$PWD/kubeconfig-podman
+kubectl get pods -A
+
+# Add worker nodes (optional)
+bink node add node2
+bink node add node3
 kubectl get nodes
 ```
 
@@ -34,15 +37,15 @@ kubectl get nodes
 
 ```bash
 # List all running clusters
-./bink cluster list
+bink cluster list
 ```
 
 ## Delete a Cluster
 
 ```bash
 # Stop and remove all nodes
-./bink cluster stop
+bink cluster stop
 
 # Stop and also remove persistent data (SSH keys, kubeconfig)
-./bink cluster stop --remove-data
+bink cluster stop --remove-data
 ```
