@@ -178,3 +178,10 @@ func (n *Node) Create(ctx context.Context) error {
 func (n *Node) Exists(ctx context.Context) (bool, error) {
 	return n.podman.ContainerExists(ctx, n.ContainerName)
 }
+
+func (n *Node) role() string {
+	if n.IsControlPlane {
+		return "control-plane"
+	}
+	return "worker"
+}
