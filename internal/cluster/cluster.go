@@ -20,6 +20,7 @@ type PodmanClient interface {
 	ContainerCreate(ctx context.Context, opts *podman.ContainerCreateOptions) (string, error)
 	ContainerExists(ctx context.Context, name string) (bool, error)
 	ContainerRemove(ctx context.Context, name string, force bool) error
+	ContainerCopyContent(ctx context.Context, content []byte, containerName, destPath string, mode int64) error
 	ContainerExec(ctx context.Context, name string, cmd []string) (string, error)
 	ContainerExecQuiet(ctx context.Context, name string, cmd []string) error
 	ContainerRunQuiet(ctx context.Context, image string, cmd []string, volumeMounts []string) error

@@ -190,9 +190,7 @@ func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string,
 		return fmt.Errorf("failed to render kubeadm config: %w", err)
 	}
 
-	content := buf.String()
-	cmd := []string{"bash", "-c", fmt.Sprintf("cat > /tmp/kubeadm-config.yaml << 'KUBEADM'\n%sKUBEADM\n", content)}
-	if err := c.podmanClient.ContainerExecQuiet(ctx, containerName, cmd); err != nil {
+	if err := c.podmanClient.ContainerCopyContent(ctx, buf.Bytes(), containerName, "/tmp/kubeadm-config.yaml", 0644); err != nil {
 		return fmt.Errorf("failed to create config: %w", err)
 	}
 
