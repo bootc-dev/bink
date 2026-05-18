@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -30,8 +31,11 @@ var _ = Describe("Cluster Lifecycle", func() {
 		})
 
 		It("should create and initialize a complete Kubernetes cluster", func() {
-			By("Creating cluster with auto-assigned API port and memory ballooning")
-			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096")
+			kubeconfigPath := fmt.Sprintf("../../kubeconfig-%s", clusterName)
+			defer helpers.CleanupKubeconfig(kubeconfigPath)
+
+			By("Creating cluster with --expose to auto-generate kubeconfig")
+			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--expose", kubeconfigPath)
 			session := helpers.RunCommand(cmd)
 
 			By("Verifying cluster creation command succeeded")
@@ -53,9 +57,21 @@ var _ = Describe("Cluster Lifecycle", func() {
 			}
 			Expect(portPublished).To(BeTrue(), "API server port (6443/tcp) should be published to a random host port")
 
-			By("Exposing API and creating Kubernetes client")
-			kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
-			defer helpers.CleanupKubeconfig(kubeconfigPath)
+			By("Verifying kubeconfig was created by --expose")
+			_, err := os.Stat(kubeconfigPath)
+			Expect(err).ToNot(HaveOccurred(), "kubeconfig file should exist at %s", kubeconfigPath)
+
+			By("Creating Kubernetes client from --expose kubeconfig")
+			kubeClient := helpers.NewKubeClient(kubeconfigPath)
+
+			By("Verifying bink api expose still works independently")
+			exposeKubeconfigPath := fmt.Sprintf("../../kubeconfig-%s-expose", clusterName)
+			defer helpers.CleanupKubeconfig(exposeKubeconfigPath)
+			helpers.ExposeAPI(clusterName, exposeKubeconfigPath)
+			_, err = os.Stat(exposeKubeconfigPath)
+			Expect(err).ToNot(HaveOccurred(), "kubeconfig from bink api expose should exist at %s", exposeKubeconfigPath)
+			exposeClient := helpers.NewKubeClient(exposeKubeconfigPath)
+			Expect(exposeClient).ToNot(BeNil(), "Kubernetes client from bink api expose kubeconfig should be valid")
 
 			By("Verifying Kubernetes is initialized and node is Ready")
 			helpers.WaitForNodeReady(kubeClient, "node1", 5*time.Minute)
