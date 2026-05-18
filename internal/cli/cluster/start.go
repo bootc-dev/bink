@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/bootc-dev/bink/internal/cli/api"
 	"github.com/bootc-dev/bink/internal/cluster"
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/dns"
@@ -22,6 +23,7 @@ func newStartCmd() *cobra.Command {
 	var apiPort int
 	var memory int
 	var maxMemory int
+	var exposePath string
 
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -29,7 +31,7 @@ func newStartCmd() *cobra.Command {
 		Long:  "Create network, control plane node, and initialize Kubernetes cluster with kubeadm",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, nodeImage, apiPort, memory, maxMemory)
+			return runStart(cmd.Context(), logger, nodeImage, apiPort, memory, maxMemory, exposePath)
 		},
 	}
 
@@ -37,11 +39,12 @@ func newStartCmd() *cobra.Command {
 	cmd.Flags().IntVar(&apiPort, "api-port", 0, "API server port to expose (0 = auto-assign random port)")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 2048 MB)")
 	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = same as --memory)")
+	cmd.Flags().StringVar(&exposePath, "expose", "", "Expose API and save kubeconfig to PATH after cluster is up")
 
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiPort int, memory int, maxMemory int) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string) error {
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -172,12 +175,20 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	logger.Infof("  Push:  podman push --tls-verify=false localhost:%d/<image>:<tag>", config.RegistryPort)
 	logger.Infof("  Pull (in-cluster): %s.%s:%d/<image>:<tag>", config.RegistryHostname, config.ClusterDomain, config.RegistryPort)
 	logger.Info("")
-	logger.Info("Next steps:")
-	logger.Info("  ./bink api expose")
-	logger.Info("")
-	logger.Info("Then use:")
-	logger.Info("  export KUBECONFIG=./kubeconfig")
-	logger.Info("  kubectl get nodes")
+
+	if exposePath != "" {
+		logger.Info("Step 9: Exposing API server...")
+		if err := api.RunExpose(ctx, logger, "", exposePath); err != nil {
+			return fmt.Errorf("exposing API: %w", err)
+		}
+	} else {
+		logger.Info("Next steps:")
+		logger.Info("  ./bink api expose")
+		logger.Info("")
+		logger.Info("Then use:")
+		logger.Info("  export KUBECONFIG=./kubeconfig")
+		logger.Info("  kubectl get nodes")
+	}
 	logger.Info("")
 	logger.Info("To add worker nodes:")
 	logger.Info("  bink node add node2")

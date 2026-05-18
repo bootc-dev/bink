@@ -34,7 +34,7 @@ This command:
 4. Generates a kubeconfig file configured to use localhost:<haproxy-port>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runExpose(cmd.Context(), logger, nodeName, kubeconfigPath)
+			return RunExpose(cmd.Context(), logger, nodeName, kubeconfigPath)
 		},
 	}
 
@@ -44,7 +44,7 @@ This command:
 	return cmd
 }
 
-func runExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigPath string) error {
+func RunExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigPath string) error {
 	clusterName := viper.GetString("cluster.name")
 
 	defaultPath := filepath.Join(config.DefaultKubeconfigDir, "kubeconfig")
