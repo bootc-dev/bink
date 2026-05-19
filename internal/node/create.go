@@ -70,6 +70,7 @@ func (n *Node) createContainer(ctx context.Context) error {
 			"bink.cluster-name": clusterLabel,
 			"bink.node-name":    n.Name,
 			"bink.cluster-ip":   n.ClusterIP,
+			"bink.node-role":    n.role(),
 		},
 		CapAdd:      []string{"SYS_ADMIN"},
 		SelinuxOpts: []string{"disable"},

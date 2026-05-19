@@ -108,9 +108,12 @@ func WaitForPodReady(client *kubernetes.Clientset, namespace, labelSelector stri
 }
 
 // GetNodeCount returns the number of Kubernetes nodes in the cluster.
+// Returns -1 on error so callers using Eventually can retry.
 func GetNodeCount(client *kubernetes.Clientset) int {
 	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	Expect(err).ToNot(HaveOccurred(), "Failed to list nodes")
+	if err != nil {
+		return -1
+	}
 	return len(nodes.Items)
 }
 
