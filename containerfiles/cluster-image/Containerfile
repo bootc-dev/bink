@@ -31,8 +31,11 @@ RUN echo 'root:100000:65536' > /etc/subuid && \
     echo 'root:100000:65536' > /etc/subgid
 RUN systemctl enable libvirtd.socket libvirtd-tcp.socket \
     virtlogd.service virtiofsd.service && \
-    systemctl mask virtqemud.service virtqemud.socket \
+    systemctl mask \
+    virtqemud.service virtqemud.socket virtqemud-ro.socket virtqemud-admin.socket \
     virtproxyd.service virtproxyd.socket virtproxyd-ro.socket virtproxyd-admin.socket \
+    virtnetworkd.service virtnetworkd.socket virtnetworkd-ro.socket virtnetworkd-admin.socket \
+    virtstoraged.service virtstoraged.socket virtstoraged-ro.socket virtstoraged-admin.socket \
     systemd-logind.service getty.target console-getty.service
 
 STOPSIGNAL SIGRTMIN+3
