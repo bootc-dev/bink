@@ -59,13 +59,13 @@ Bink manages multi-node Kubernetes clusters where each node runs as a rootless P
 
 Each Kubernetes node is a Podman container running the `localhost/cluster:latest` image (Fedora 43 with libvirt, QEMU, and virtiofsd). Containers are named `k8s-<cluster>-<node>` (e.g., `k8s-dev-node1`) and labeled with `bink.cluster-name` and `bink.node-name` for discovery.
 
-The container runs four libvirt daemons (`virtlogd`, `virtstoraged`, `virtnetworkd`, `virtqemud`) and a `virtiofsd` instance. It requires `/dev/kvm` for hardware virtualization and `/dev/fuse` for virtiofs, plus `SYS_ADMIN` capability. SELinux is disabled inside the container.
+The container runs the monolithic `libvirtd` daemon (with TCP socket on port 16509 for the Go bindings to connect) along with `virtlogd` and a `virtiofsd` instance. All modular libvirt daemons (`virtqemud`, `virtproxyd`, `virtnetworkd`, `virtstoraged`) are masked to avoid conflicts with the monolithic daemon. It requires `/dev/kvm` for hardware virtualization and `/dev/fuse` for virtiofs, plus `SYS_ADMIN` capability. SELinux is disabled inside the container.
 
-Control-plane containers publish port 6443 to a random host port for API access within the cluster. External API access from the host goes through the HAProxy load balancer (see below).
+All containers publish the libvirt TCP port (16509) to a random host port so bink can connect to libvirtd from the host via the Go bindings. Control-plane containers additionally publish port 6443 for API access within the cluster. External API access from the host goes through the HAProxy load balancer (see below).
 
 ### Virtual Machine
 
-Inside each container, a Fedora bootc VM runs via libvirt/QEMU. The VM boots from a qcow2 overlay disk backed by a shared read-only base image (`fedora-bootc-k8s.qcow2`). Cloud-init configures the VM on first boot: hostname, networking, SSH keys, CRI-O, kubelet, and kernel parameters.
+Inside each container, a Fedora bootc VM is defined and started using the libvirt Go bindings (`libvirt.org/go/libvirt` and `libvirt.org/go/libvirtxml`). Bink connects to the monolithic libvirtd via `qemu+tcp://localhost:<port>/session`, constructs the domain XML programmatically, and calls `DomainDefineXML` + `Domain.Create`. The VM boots from a qcow2 overlay disk backed by a shared read-only base image (`fedora-bootc-k8s.qcow2`). Cloud-init configures the VM on first boot: hostname, networking, SSH keys, CRI-O, kubelet, and kernel parameters.
 
 The VM runs:
 - **CRI-O** as the container runtime
@@ -208,9 +208,9 @@ A cluster starts with a single control-plane node (`node1`) and can grow by addi
 1. Create the Podman bridge network for the cluster
 2. Create the `cluster-keys` volume and generate an SSH key pair (RSA 4096-bit)
 3. Ensure the global `cluster-images` volume is populated
-4. Create the node1 container with libvirt daemons
+4. Create the node1 container with monolithic libvirtd
 5. Create a qcow2 overlay disk and a cloud-init ISO
-6. Boot the VM via virt-install with dual NICs and virtiofs
+6. Define and start the VM via libvirt Go bindings (`libvirt.org/go/libvirt`) with dual NICs and virtiofs
 7. Wait for cloud-init to complete (configures networking, CRI-O, kubelet)
 8. Run `kubeadm init` with the node's cluster IP as the advertise address
 9. Install Calico CNI and patch CoreDNS for CRI-O compatibility
