@@ -578,6 +578,44 @@ func (c *Client) ContainerCopy(ctx context.Context, srcPath, containerName, dest
 	return nil
 }
 
+func (c *Client) ContainerCopyContent(ctx context.Context, content []byte, containerName, destPath string, mode int64) error {
+	if err := c.ensureConnection(); err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	header := &tar.Header{
+		Name: filepath.Base(destPath),
+		Mode: mode,
+		Size: int64(len(content)),
+	}
+
+	if err := tw.WriteHeader(header); err != nil {
+		return fmt.Errorf("writing tar header: %w", err)
+	}
+
+	if _, err := tw.Write(content); err != nil {
+		return fmt.Errorf("writing tar data: %w", err)
+	}
+
+	if err := tw.Close(); err != nil {
+		return fmt.Errorf("closing tar writer: %w", err)
+	}
+
+	copyFunc, err := containers.CopyFromArchive(c.conn, containerName, filepath.Dir(destPath), &buf)
+	if err != nil {
+		return fmt.Errorf("preparing copy: %w", err)
+	}
+
+	if err := copyFunc(); err != nil {
+		return fmt.Errorf("copying to container: %w", err)
+	}
+
+	return nil
+}
+
 func (c *Client) VolumeRemove(ctx context.Context, name string) error {
 	if err := c.ensureConnection(); err != nil {
 		return err

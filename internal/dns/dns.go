@@ -117,23 +117,48 @@ func (m *Manager) createContainer(ctx context.Context) error {
 	return nil
 }
 
+const dnsLockPath = "/tmp/dns.lock"
+
 func (m *Manager) AddEntry(ctx context.Context, nodeName string) error {
 	nodeIP := node.CalculateClusterIP(m.clusterName, nodeName)
+	containerName := m.containerName()
 
 	logrus.Infof("Adding DNS entry: %s -> %s", nodeName, nodeIP)
 
-	entry := fmt.Sprintf("%s %s %s.%s", nodeIP, nodeName, nodeName, config.ClusterDomain)
+	if _, err := m.podman.ContainerExec(ctx, containerName, []string{"mkdir", dnsLockPath}); err != nil {
+		return fmt.Errorf("DNS update already in progress: %w", err)
+	}
+	defer func() {
+		_, _ = m.podman.ContainerExec(ctx, containerName, []string{"rmdir", dnsLockPath})
+	}()
 
-	cmd := []string{
-		"sh", "-c",
-		fmt.Sprintf(
-			`flock /tmp/dns.lock sh -c 'tmp=$(mktemp /tmp/cluster-hosts.XXXXXX) && grep -v "^[^#]*[[:space:]]%s[[:space:]]" %s > "$tmp" 2>/dev/null || true && echo "%s" >> "$tmp" && mv "$tmp" %s' && kill -HUP 1`,
-			nodeName, config.DNSMasqHostsFile, entry, config.DNSMasqHostsFile,
-		),
+	current, err := m.podman.ContainerExec(ctx, containerName, []string{"cat", config.DNSMasqHostsFile})
+	if err != nil {
+		if !strings.Contains(err.Error(), "No such file") {
+			return fmt.Errorf("reading DNS hosts file: %w", err)
+		}
+		current = ""
 	}
 
-	if _, err := m.podman.ContainerExec(ctx, m.containerName(), cmd); err != nil {
-		return fmt.Errorf("adding DNS entry: %w", err)
+	var lines []string
+	for _, line := range strings.Split(current, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[1] == nodeName {
+			continue
+		}
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	lines = append(lines, fmt.Sprintf("%s %s %s.%s", nodeIP, nodeName, nodeName, config.ClusterDomain))
+
+	content := strings.Join(lines, "\n") + "\n"
+	if err := m.podman.ContainerCopyContent(ctx, []byte(content), containerName, config.DNSMasqHostsFile, 0644); err != nil {
+		return fmt.Errorf("writing DNS hosts file: %w", err)
+	}
+
+	if _, err := m.podman.ContainerExec(ctx, containerName, []string{"kill", "-HUP", "1"}); err != nil {
+		return fmt.Errorf("reloading dnsmasq: %w", err)
 	}
 
 	logrus.Infof("DNS entry added: %s -> %s", nodeName, nodeIP)
