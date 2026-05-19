@@ -31,18 +31,19 @@ var _ = Describe("Cluster Lifecycle", func() {
 		})
 
 		It("should create and initialize a complete Kubernetes cluster", func() {
+			customNodeName := "cp1"
 			kubeconfigPath := fmt.Sprintf("../../kubeconfig-%s", clusterName)
 			defer helpers.CleanupKubeconfig(kubeconfigPath)
 
-			By("Creating cluster with --expose to auto-generate kubeconfig")
-			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--expose", kubeconfigPath)
+			By("Creating cluster with --expose, custom node name, and memory ballooning")
+			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-name", customNodeName, "--expose", kubeconfigPath)
 			session := helpers.RunCommand(cmd)
 
 			By("Verifying cluster creation command succeeded")
 			Expect(session.ExitCode()).To(Equal(0))
 
-			By("Verifying container exists and is running")
-			containerName := helpers.NodeContainerName(clusterName, "node1")
+			By("Verifying container exists and is running with custom node name")
+			containerName := helpers.NodeContainerName(clusterName, customNodeName)
 			container := helpers.GetContainer(containerName)
 			Expect(container).ToNot(BeNil(), "Container %s should exist", containerName)
 			Expect(container.State).To(Equal("running"), "Container should be running")
@@ -73,14 +74,14 @@ var _ = Describe("Cluster Lifecycle", func() {
 			exposeClient := helpers.NewKubeClient(exposeKubeconfigPath)
 			Expect(exposeClient).ToNot(BeNil(), "Kubernetes client from bink api expose kubeconfig should be valid")
 
-			By("Verifying Kubernetes is initialized and node is Ready")
-			helpers.WaitForNodeReady(kubeClient, "node1", 5*time.Minute)
+			By("Verifying Kubernetes is initialized and node is Ready with custom name")
+			helpers.WaitForNodeReady(kubeClient, customNodeName, 5*time.Minute)
 
-			By("Verifying node1 has control-plane role")
-			n1, err := kubeClient.CoreV1().Nodes().Get(context.Background(), "node1", metav1.GetOptions{})
+			By("Verifying custom-named node has control-plane role")
+			n1, err := kubeClient.CoreV1().Nodes().Get(context.Background(), customNodeName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, hasCP := n1.Labels["node-role.kubernetes.io/control-plane"]
-			Expect(hasCP).To(BeTrue(), "node1 should have control-plane role")
+			Expect(hasCP).To(BeTrue(), "%s should have control-plane role", customNodeName)
 
 			By("Verifying Calico CNI is running")
 			helpers.WaitForPodReady(kubeClient, "kube-system", "k8s-app=calico-node", 3*time.Minute)
@@ -90,14 +91,14 @@ var _ = Describe("Cluster Lifecycle", func() {
 			Expect(dnsContainer).ToNot(BeNil(), "DNS container should exist")
 			Expect(dnsContainer.State).To(Equal("running"), "DNS container should be running")
 
-			By("Verifying cluster-hosts file in DNS container")
+			By("Verifying cluster-hosts file in DNS container contains custom node name")
 			hostsFile := helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
-			Expect(hostsFile).To(ContainSubstring("node1"), "cluster-hosts should contain node1")
-			expectedIP := node.CalculateClusterIP(clusterName, "node1")
-			Expect(hostsFile).To(ContainSubstring(expectedIP), "cluster-hosts should contain node1 IP")
+			Expect(hostsFile).To(ContainSubstring(customNodeName), "cluster-hosts should contain %s", customNodeName)
+			expectedIP := node.CalculateClusterIP(clusterName, customNodeName)
+			Expect(hostsFile).To(ContainSubstring(expectedIP), "cluster-hosts should contain %s IP", customNodeName)
 
 			By("Removing control-plane taint to allow scheduling on single-node cluster")
-			helpers.RemoveControlPlaneTaint(kubeClient, "node1")
+			helpers.RemoveControlPlaneTaint(kubeClient, customNodeName)
 
 			By("Deploying a busybox pod to verify cluster is functional")
 			busyboxPod := &corev1.Pod{

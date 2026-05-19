@@ -19,6 +19,7 @@ import (
 )
 
 func newStartCmd() *cobra.Command {
+	var nodeName string
 	var nodeImage string
 	var apiPort int
 	var memory int
@@ -31,10 +32,11 @@ func newStartCmd() *cobra.Command {
 		Long:  "Create network, control plane node, and initialize Kubernetes cluster with kubeadm",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, nodeImage, apiPort, memory, maxMemory, exposePath)
+			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath)
 		},
 	}
 
+	cmd.Flags().StringVar(&nodeName, "node-name", "node1", "Name for the control plane node")
 	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().IntVar(&apiPort, "api-port", 0, "API server port to expose (0 = auto-assign random port)")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use role default: 1900 for control-plane, 768 for worker)")
@@ -44,7 +46,7 @@ func newStartCmd() *cobra.Command {
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string) error {
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -98,7 +100,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	logger.Info("Step 5: Preparing cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{
 		Name:         clusterName,
-		ControlPlane: "node1",
+		ControlPlane: nodeName,
 		Logger:       logger,
 	})
 
@@ -108,7 +110,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 	logger.Info("")
 
-	logger.Info("Step 6: Creating control plane node (node1)...")
+	logger.Infof("Step 6: Creating control plane node (%s)...", nodeName)
 	logger.Infof("Node image: %s", nodeImage)
 
 	// Convert 0 to -1 for auto-assign (to distinguish from unset)
@@ -116,7 +118,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 		apiPort = -1
 	}
 
-	controlPlane, err := node.New("node1", true,
+	controlPlane, err := node.New(nodeName, true,
 		node.WithNodeImage(nodeImage),
 		node.WithClusterName(clusterName),
 		node.WithAPIPort(apiPort),
@@ -135,23 +137,23 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeImage string, apiP
 	}
 
 	if exists {
-		return fmt.Errorf("node1 already exists. Run 'bink cluster stop' first")
+		return fmt.Errorf("%s already exists. Run 'bink cluster stop' first", nodeName)
 	}
 
 	if err := controlPlane.Create(ctx); err != nil {
 		return fmt.Errorf("creating control plane node: %w", err)
 	}
 
-	logger.Info("Adding node1 DNS entry...")
-	if err := dnsMgr.AddEntry(ctx, "node1"); err != nil {
-		return fmt.Errorf("adding node1 DNS entry: %w", err)
+	logger.Infof("Adding %s DNS entry...", nodeName)
+	if err := dnsMgr.AddEntry(ctx, nodeName); err != nil {
+		return fmt.Errorf("adding %s DNS entry: %w", nodeName, err)
 	}
 	logger.Info("")
 
 	logger.Info("Step 7: Initializing Kubernetes cluster...")
 
 	if err := clusterMgr.Init(ctx, cluster.InitOptions{
-		NodeName: "node1",
+		NodeName: nodeName,
 	}); err != nil {
 		return fmt.Errorf("initializing cluster: %w", err)
 	}
