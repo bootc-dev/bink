@@ -41,6 +41,7 @@ run_test() {
             echo "Starting bink daemon container: ${nested_container}"
             podman run -d --name "${nested_container}" --privileged \
                 --device /dev/kvm \
+                --ulimit core=-1:-1 \
                 -v "bink-test-storage:/var/lib/containers" \
                 -v "$(pwd):/output" \
                 "${BINK_IMAGE}"
@@ -51,6 +52,10 @@ run_test() {
                 fi
                 sleep 0.5
             done
+            # The outer container's resolv.conf points to the host's aardvark-dns, which is
+            # unreachable from inside nested podman networks. Override it so inner aardvark-dns
+            # forwards queries to a public resolver instead.
+            podman exec "${nested_container}" bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
             bink_args=(podman exec "${nested_container}" bink)
             ;;
         *)
@@ -73,7 +78,9 @@ run_test() {
     "${bink_args[@]}" --help
 
     echo "--- bink cluster start ---"
-    "${bink_args[@]}" cluster start --cluster-name "${cluster_name}" --api-port 0
+    local verbose_flag=""
+    [ "${mode}" = "nested" ] && verbose_flag="-v"
+    "${bink_args[@]}" cluster start --cluster-name "${cluster_name}" --api-port 0 ${verbose_flag}
 
     echo "--- bink api expose ---"
     "${bink_args[@]}" api expose --cluster-name "${cluster_name}"
