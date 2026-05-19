@@ -55,6 +55,7 @@ jobs:
             libgpgme-dev \
             libbtrfs-dev \
             libdevmapper-dev \
+            libvirt-dev \
             pkg-config
 
       - name: Configure Podman
@@ -71,7 +72,7 @@ jobs:
           sudo podman info --format '{{.Store.GraphRoot}}'
 
       - name: Build bink binary
-        run: sudo make build-bink
+        run: make build-bink
 
       - name: Verify prerequisites
         run: |
@@ -80,9 +81,11 @@ jobs:
           df -h /
           free -h
 
+      - name: Build cluster image from branch
+        run: sudo make build-cluster-image
+
       - name: Pre-pull container images
         run: |
-          sudo podman pull ghcr.io/alicefr/bink/cluster:latest
           sudo podman pull ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk
           sudo podman pull ghcr.io/alicefr/bink/dns:latest
           sudo podman pull docker.io/library/registry:2

@@ -32,6 +32,7 @@ jobs:
             libgpgme-dev \
             libbtrfs-dev \
             libdevmapper-dev \
+            libvirt-dev \
             pkg-config
 
       - name: Run unit tests
