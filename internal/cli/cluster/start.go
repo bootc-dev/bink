@@ -37,8 +37,8 @@ func newStartCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().IntVar(&apiPort, "api-port", 0, "API server port to expose (0 = auto-assign random port)")
-	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use default 2048 MB)")
-	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = same as --memory)")
+	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use role default: 1900 for control-plane, 768 for worker)")
+	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = use role default: 4096 for control-plane, 2048 for worker)")
 	cmd.Flags().StringVar(&exposePath, "expose", "", "Expose API and save kubeconfig to PATH after cluster is up")
 
 	return cmd
