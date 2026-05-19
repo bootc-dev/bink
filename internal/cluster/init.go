@@ -87,7 +87,10 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	c.logger.Infof("=== Initializing Kubernetes cluster on %s ===", nodeName)
 	c.logger.Info("")
 
-	if err := sshClient.ExecWithOutput(ctx, "sudo kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --skip-phases=addon/coredns"); err != nil {
+	initCtx, initCancel := context.WithTimeout(ctx, opts.Timeout)
+	defer initCancel()
+
+	if err := sshClient.ExecWithOutput(initCtx, "sudo kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --skip-phases=addon/coredns"); err != nil {
 		return fmt.Errorf("kubeadm init failed: %w", err)
 	}
 
