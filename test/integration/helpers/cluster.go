@@ -72,6 +72,16 @@ func AddNode(clusterName, nodeName string, extraArgs ...string) {
 	Expect(session.ExitCode()).To(Equal(0), "Failed to add node: %s", string(session.Err.Contents()))
 }
 
+// RemoveNode removes a node from the cluster
+func RemoveNode(clusterName, nodeName string, extraArgs ...string) {
+	GinkgoWriter.Printf("Removing node %s from cluster %s\n", nodeName, clusterName)
+	args := []string{"node", "remove", nodeName, "--cluster-name", clusterName}
+	args = append(args, extraArgs...)
+	cmd := BinkCmd(args...)
+	session := RunCommand(cmd, 5*time.Minute)
+	Expect(session.ExitCode()).To(Equal(0), "Failed to remove node: %s", string(session.Err.Contents()))
+}
+
 // StopCluster stops a cluster
 func StopCluster(name string) {
 	GinkgoWriter.Printf("Stopping cluster: %s\n", name)

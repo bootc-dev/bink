@@ -117,6 +117,28 @@ var _ = Describe("Multi-Node Clusters", func() {
 
 		By("Verifying node count")
 		Expect(helpers.GetNodeCount(kubeClient)).To(Equal(3))
+
+		By("Removing worker node3")
+		helpers.RemoveNode(clusterName, node3)
+
+		By("Verifying node3 is removed from Kubernetes")
+		Eventually(func() int {
+			return helpers.GetNodeCount(kubeClient)
+		}, 2*time.Minute, 10*time.Second).Should(Equal(2))
+
+		By("Verifying node3 container is removed")
+		Expect(helpers.ContainerExists(helpers.NodeContainerName(clusterName, node3))).To(BeFalse())
+
+		By("Verifying node3 DNS entry is removed")
+		hostsFile = helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
+		Expect(hostsFile).ToNot(ContainSubstring(node3), "cluster-hosts should not contain node3")
+		Expect(hostsFile).To(ContainSubstring(node1), "cluster-hosts should still contain node1")
+		Expect(hostsFile).To(ContainSubstring(node2), "cluster-hosts should still contain node2")
+
+		By("Verifying remaining nodes are still Ready")
+		for _, nodeName := range []string{node1, node2} {
+			helpers.WaitForNodeReady(kubeClient, nodeName, 2*time.Minute)
+		}
 	})
 
 	It("should add control-plane nodes for HA configuration", Serial, func() {
@@ -187,6 +209,27 @@ var _ = Describe("Multi-Node Clusters", func() {
 		Expect(listOutput).To(ContainSubstring(node1), "node list should contain node1")
 		Expect(listOutput).To(ContainSubstring(node2), "node list should contain node2")
 		Expect(listOutput).To(ContainSubstring(node3), "node list should contain node3")
+
+		By("Removing control-plane node3")
+		helpers.RemoveNode(clusterName, node3)
+
+		By("Verifying node3 is removed from Kubernetes")
+		Eventually(func() int {
+			return helpers.GetNodeCount(kubeClient)
+		}, 2*time.Minute, 10*time.Second).Should(Equal(2))
+
+		By("Verifying node3 container is removed")
+		Expect(helpers.ContainerExists(helpers.NodeContainerName(clusterName, node3))).To(BeFalse())
+
+		By("Verifying remaining control-plane nodes are still Ready")
+		for _, nodeName := range []string{node1, node2} {
+			helpers.WaitForNodeReady(kubeClient, nodeName, 2*time.Minute)
+		}
+
+		By("Verifying API is still accessible after removing a control-plane node")
+		nodes, err = kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(nodes.Items).To(HaveLen(2))
 	})
 
 	It("should enable cross-node pod communication via services", func() {
