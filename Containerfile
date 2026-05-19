@@ -33,6 +33,7 @@ RUN dnf install -y \
     gpgme \
     podman \
     kubernetes-client \
+    libvirt-libs \
     && dnf clean all
 
 COPY --from=builder /output/bink /usr/local/bin/bink
