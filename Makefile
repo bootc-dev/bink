@@ -1,9 +1,10 @@
-.PHONY: all build-bink build-bink-container build-cluster-image build-dns-image clean rebuild help test-integration test-integration-quick update-calico
+.PHONY: all build-bink build-bink-image build-cluster-image build-dns-image clean rebuild help test-integration test-integration-quick update-calico
 
 # Extract image names and versions from internal/config/defaults.go (single source of truth)
 DEFAULTS_GO := internal/config/defaults.go
 extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
 
+BINK_IMAGE := $(call extract,BinkImage )
 CLUSTER_IMAGE := $(call extract,DefaultClusterImage )
 DNS_IMAGE := $(call extract,DNSImage )
 FEDORA_VERSION := $(call extract,FedoraVersion )
@@ -22,15 +23,12 @@ build-bink:
 	go build -o $(BINK_BINARY) ./cmd/bink
 	@echo "✅ bink binary built: $(BINK_BINARY)"
 
-# Build the bink CLI binary using containerized build (with all C dependencies)
-build-bink-container:
-	@echo "=== Building bink CLI binary in container ==="
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t localhost/bink-builder:latest -f Containerfile .
-	@echo "Extracting binary from container..."
-	@podman create --name bink-temp localhost/bink-builder:latest
-	@podman cp bink-temp:/output/bink ./bink
-	@podman rm bink-temp
-	@echo "✅ bink binary built in container: $(BINK_BINARY)"
+# Build the bink CLI container image
+build-bink-image:
+	@echo "=== Building bink CLI container image ==="
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --target builder -t localhost/bink-builder:latest -f Containerfile .
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(BINK_IMAGE) -f Containerfile .
+	@echo "✅ Bink CLI image built: $(BINK_IMAGE)"
 
 # Build the cluster container image
 build-cluster-image:
@@ -87,7 +85,7 @@ help:
 	@echo "Build Targets:"
 	@echo "  all                      - Build cluster image and bink binary (default)"
 	@echo "  build-bink               - Build the bink CLI binary"
-	@echo "  build-bink-container     - Build the bink CLI binary in container (with C deps)"
+	@echo "  build-bink-image         - Build the bink CLI container image"
 	@echo "  build-cluster-image      - Build the cluster container image"
 	@echo "  build-dns-image          - Build the DNS container image"
 	@echo ""
@@ -104,5 +102,6 @@ help:
 	@echo ""
 	@echo "Outputs:"
 	@echo "  Binary:         $(BINK_BINARY)"
+	@echo "  Bink image:     $(BINK_IMAGE)"
 	@echo "  Cluster image:  $(CLUSTER_IMAGE)"
 	@echo "  DNS image:      $(DNS_IMAGE)"

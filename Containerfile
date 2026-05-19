@@ -1,6 +1,6 @@
 # Build environment for bink CLI with all C dependencies
 ARG FEDORA_VERSION=43
-FROM registry.fedoraproject.org/fedora:${FEDORA_VERSION}
+FROM quay.io/fedora/fedora:${FEDORA_VERSION} AS builder
 
 # Install Go and required C libraries for Podman bindings
 RUN dnf install -y \
@@ -24,3 +24,19 @@ WORKDIR /output
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     cd /src && CGO_ENABLED=1 go build -o /output/bink ./cmd/bink
+
+# Runtime image with just the binary and required C runtime libraries
+FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION}
+
+RUN dnf install -y \
+    gpgme \
+    podman \
+    kubernetes-client \
+    && dnf clean all
+
+COPY --from=builder /output/bink /usr/local/bin/bink
+COPY containerfiles/bink/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+WORKDIR /output
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -84,6 +84,10 @@ func (m *mockPodmanClient) ContainerExists(_ context.Context, _ string) (bool, e
 	return m.containerExistsVal, nil
 }
 
+func (m *mockPodmanClient) ContainerCopyContent(_ context.Context, _ []byte, _, _ string, _ int64) error {
+	return nil
+}
+
 func (m *mockPodmanClient) ContainerRemove(_ context.Context, _ string, _ bool) error {
 	return nil
 }

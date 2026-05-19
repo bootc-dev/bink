@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os/exec"
 	"text/template"
 	"time"
 
@@ -88,7 +87,10 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	c.logger.Infof("=== Initializing Kubernetes cluster on %s ===", nodeName)
 	c.logger.Info("")
 
-	if err := sshClient.ExecWithOutput(ctx, "sudo kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --skip-phases=addon/coredns"); err != nil {
+	initCtx, initCancel := context.WithTimeout(ctx, opts.Timeout)
+	defer initCancel()
+
+	if err := sshClient.ExecWithOutput(initCtx, "sudo kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --skip-phases=addon/coredns"); err != nil {
 		return fmt.Errorf("kubeadm init failed: %w", err)
 	}
 
@@ -191,12 +193,8 @@ func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string,
 		return fmt.Errorf("failed to render kubeadm config: %w", err)
 	}
 
-	cmd := fmt.Sprintf("podman exec %s bash -c 'cat > /tmp/kubeadm-config.yaml << \"KUBEADM\"\n%sKUBEADM\n'", containerName, buf.String())
-
-	execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create config: %w: %s", err, string(output))
+	if err := c.podmanClient.ContainerCopyContent(ctx, buf.Bytes(), containerName, "/tmp/kubeadm-config.yaml", 0644); err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
 	}
 
 	return nil

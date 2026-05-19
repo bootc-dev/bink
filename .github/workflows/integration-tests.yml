@@ -71,7 +71,7 @@ jobs:
           sudo podman info --format '{{.Store.GraphRoot}}'
 
       - name: Build bink binary
-        run: sudo make build-bink-container
+        run: sudo make build-bink
 
       - name: Verify prerequisites
         run: |
