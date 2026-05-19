@@ -521,6 +521,16 @@ func (c *Client) ContainerInspect(ctx context.Context, name, format string) (str
 			return ip, nil
 		}
 		return "", nil
+	case `{{index .Config.Labels "bink.node-role"}}`:
+		if role, ok := data.Config.Labels["bink.node-role"]; ok {
+			return role, nil
+		}
+		return "", nil
+	case `{{index .Config.Labels "bink.component"}}`:
+		if component, ok := data.Config.Labels["bink.component"]; ok {
+			return component, nil
+		}
+		return "", nil
 	default:
 		return "", fmt.Errorf("unsupported format string: %s", format)
 	}

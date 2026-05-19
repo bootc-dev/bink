@@ -13,6 +13,7 @@ func NewNodeCmd() *cobra.Command {
 
 	cmd.AddCommand(newAddCmd())
 	cmd.AddCommand(newJoinCmd())
+	cmd.AddCommand(newRemoveCmd())
 	cmd.AddCommand(newSSHCmd())
 	cmd.AddCommand(newListCmd())
 

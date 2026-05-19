@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -16,6 +19,107 @@ func (c *Client) PatchDeployment(ctx context.Context, namespace, name string, pa
 	)
 	if err != nil {
 		return fmt.Errorf("patching deployment %s/%s: %w", namespace, name, err)
+	}
+	return nil
+}
+
+// DrainNode cordons the node and evicts all non-DaemonSet pods.
+func (c *Client) DrainNode(ctx context.Context, nodeName string) error {
+	// Cordon the node
+	patch := []byte(`{"spec":{"unschedulable":true}}`)
+	_, err := c.clientset.CoreV1().Nodes().Patch(
+		ctx, nodeName, types.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("cordoning node %s: %w", nodeName, err)
+	}
+
+	// List pods on this node, excluding DaemonSet-owned and mirror pods
+	podList, err := c.clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String(),
+	})
+	if err != nil {
+		return fmt.Errorf("listing pods on node %s: %w", nodeName, err)
+	}
+
+	for _, pod := range podList.Items {
+		// Skip DaemonSet-owned pods
+		isDaemonSet := false
+		for _, ref := range pod.OwnerReferences {
+			if ref.Kind == "DaemonSet" {
+				isDaemonSet = true
+				break
+			}
+		}
+		if isDaemonSet {
+			continue
+		}
+
+		// Skip mirror pods (static pods managed by kubelet)
+		if _, ok := pod.Annotations["kubernetes.io/config.mirror"]; ok {
+			continue
+		}
+
+		eviction := &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+		}
+		err := c.clientset.CoreV1().Pods(pod.Namespace).EvictV1(ctx, eviction)
+		if err != nil {
+			return fmt.Errorf("evicting pod %s/%s: %w", pod.Namespace, pod.Name, err)
+		}
+	}
+
+	// Wait for pods to be evicted
+	deadline := time.After(2 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline:
+			return fmt.Errorf("timed out waiting for pods to drain from node %s", nodeName)
+		case <-ticker.C:
+			remaining, err := c.clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+				FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String(),
+			})
+			if err != nil {
+				return fmt.Errorf("listing pods on node %s: %w", nodeName, err)
+			}
+
+			nonDaemonSetCount := 0
+			for _, pod := range remaining.Items {
+				isDaemonSet := false
+				for _, ref := range pod.OwnerReferences {
+					if ref.Kind == "DaemonSet" {
+						isDaemonSet = true
+						break
+					}
+				}
+				if _, ok := pod.Annotations["kubernetes.io/config.mirror"]; ok {
+					continue
+				}
+				if !isDaemonSet {
+					nonDaemonSetCount++
+				}
+			}
+
+			if nonDaemonSetCount == 0 {
+				return nil
+			}
+		}
+	}
+}
+
+// DeleteNode removes the node object from Kubernetes.
+func (c *Client) DeleteNode(ctx context.Context, nodeName string) error {
+	err := c.clientset.CoreV1().Nodes().Delete(ctx, nodeName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("deleting node %s: %w", nodeName, err)
 	}
 	return nil
 }

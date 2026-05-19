@@ -121,9 +121,29 @@ const dnsLockPath = "/tmp/dns.lock"
 
 func (m *Manager) AddEntry(ctx context.Context, nodeName string) error {
 	nodeIP := node.CalculateClusterIP(m.clusterName, nodeName)
-	containerName := m.containerName()
+	newLine := fmt.Sprintf("%s %s %s.%s", nodeIP, nodeName, nodeName, config.ClusterDomain)
 
 	logrus.Infof("Adding DNS entry: %s -> %s", nodeName, nodeIP)
+	if err := m.updateHostsFile(ctx, nodeName, newLine); err != nil {
+		return err
+	}
+	logrus.Infof("DNS entry added: %s -> %s", nodeName, nodeIP)
+	return nil
+}
+
+func (m *Manager) RemoveEntry(ctx context.Context, nodeName string) error {
+	logrus.Infof("Removing DNS entry for: %s", nodeName)
+	if err := m.updateHostsFile(ctx, nodeName, ""); err != nil {
+		return err
+	}
+	logrus.Infof("DNS entry removed for: %s", nodeName)
+	return nil
+}
+
+// updateHostsFile removes any existing entry for nodeName and optionally
+// appends newLine. Pass an empty newLine to only remove.
+func (m *Manager) updateHostsFile(ctx context.Context, nodeName, newLine string) error {
+	containerName := m.containerName()
 
 	if _, err := m.podman.ContainerExec(ctx, containerName, []string{"mkdir", dnsLockPath}); err != nil {
 		return fmt.Errorf("DNS update already in progress: %w", err)
@@ -150,7 +170,9 @@ func (m *Manager) AddEntry(ctx context.Context, nodeName string) error {
 			lines = append(lines, line)
 		}
 	}
-	lines = append(lines, fmt.Sprintf("%s %s %s.%s", nodeIP, nodeName, nodeName, config.ClusterDomain))
+	if newLine != "" {
+		lines = append(lines, newLine)
+	}
 
 	content := strings.Join(lines, "\n") + "\n"
 	if err := m.podman.ContainerCopyContent(ctx, []byte(content), containerName, config.DNSMasqHostsFile, 0644); err != nil {
@@ -161,7 +183,6 @@ func (m *Manager) AddEntry(ctx context.Context, nodeName string) error {
 		return fmt.Errorf("reloading dnsmasq: %w", err)
 	}
 
-	logrus.Infof("DNS entry added: %s -> %s", nodeName, nodeIP)
 	return nil
 }
 
