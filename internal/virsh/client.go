@@ -92,7 +92,8 @@ func (c *Client) DefineAndStartDomain(ctx context.Context, opts ...DomainOption)
 		return fmt.Errorf("connecting to libvirt: %w", err)
 	}
 
-	xmlStr, err := MarshalDomainXML(opts...)
+	domain := NewDomain(opts...)
+	xmlStr, err := domain.Marshal()
 	if err != nil {
 		return fmt.Errorf("building domain XML: %w", err)
 	}
@@ -109,7 +110,6 @@ func (c *Client) DefineAndStartDomain(ctx context.Context, opts ...DomainOption)
 		return fmt.Errorf("starting domain: %w", err)
 	}
 
-	domain := NewDomain(opts...)
 	logrus.Infof("Domain %s defined and started via libvirt", domain.Name)
 	return nil
 }
