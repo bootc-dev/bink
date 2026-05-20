@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BINK_IMAGE="${BINK_IMAGE:-ghcr.io/alicefr/bink/bink:latest}"
+CLUSTER_IMAGE="${CLUSTER_IMAGE:-ghcr.io/alicefr/bink/cluster:latest}"
 if [ -n "${CONTAINER_HOST:-}" ]; then
     PODMAN_SOCK="${CONTAINER_HOST#unix://}"
 elif [ -S "/run/podman/podman.sock" ]; then
@@ -56,6 +57,12 @@ run_test() {
             # unreachable from inside nested podman networks. Override it so inner aardvark-dns
             # forwards queries to a public resolver instead.
             podman exec "${nested_container}" bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+            # Pre-load locally-built images into the nested container to avoid
+            # pulling from the registry (which may also be stale).
+            if podman image exists "${CLUSTER_IMAGE}" 2>/dev/null; then
+                echo "Loading ${CLUSTER_IMAGE} into nested container..."
+                podman save "${CLUSTER_IMAGE}" | podman exec -i "${nested_container}" podman load
+            fi
             bink_args=(podman exec "${nested_container}" bink)
             ;;
         *)

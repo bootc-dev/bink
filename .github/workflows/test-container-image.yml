@@ -55,6 +55,9 @@ jobs:
       - name: Build bink image
         run: sudo make build-bink-image
 
+      - name: Build cluster image
+        run: sudo make build-cluster-image
+
       - name: Test nested mode
         run: sudo hack/test-container-image.sh nested
         timeout-minutes: 40
