@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BINK_IMAGE="${BINK_IMAGE:-ghcr.io/alicefr/bink/bink:latest}"
+IMAGE_CACHE_DIR="${IMAGE_CACHE_DIR:-}"
 if [ -n "${CONTAINER_HOST:-}" ]; then
     PODMAN_SOCK="${CONTAINER_HOST#unix://}"
 elif [ -S "/run/podman/podman.sock" ]; then
@@ -38,11 +39,16 @@ run_test() {
             ;;
         nested)
             nested_container="bink-nested-${cluster_name}"
+            cache_mount=()
+            if [ -n "${IMAGE_CACHE_DIR}" ] && [ -d "${IMAGE_CACHE_DIR}" ]; then
+                cache_mount=(-v "${IMAGE_CACHE_DIR}:/cache:ro")
+            fi
             echo "Starting bink daemon container: ${nested_container}"
             podman run -d --name "${nested_container}" --privileged \
                 --device /dev/kvm \
                 --ulimit core=-1:-1 \
                 -v "bink-test-storage:/var/lib/containers" \
+                "${cache_mount[@]}" \
                 -v "$(pwd):/output" \
                 "${BINK_IMAGE}"
             echo "Waiting for podman service inside container..."
@@ -56,6 +62,14 @@ run_test() {
             # unreachable from inside nested podman networks. Override it so inner aardvark-dns
             # forwards queries to a public resolver instead.
             podman exec "${nested_container}" bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+            if podman exec "${nested_container}" test -d /cache; then
+                echo "Loading cached images into nested podman..."
+                for f in $(podman exec "${nested_container}" ls /cache/*.tar 2>/dev/null); do
+                    podman exec "${nested_container}" podman load -i "$f"
+                done
+                echo "Images available in nested podman:"
+                podman exec "${nested_container}" podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+            fi
             bink_args=(podman exec "${nested_container}" bink)
             ;;
         *)

@@ -108,6 +108,8 @@ jobs:
       - name: Test nested mode
         run: sudo hack/test-container-image.sh nested
         timeout-minutes: 40
+        env:
+          IMAGE_CACHE_DIR: /tmp/podman-image-cache
 
       - name: Test socket mode
         run: sudo hack/test-container-image.sh socket
