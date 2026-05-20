@@ -64,9 +64,7 @@ run_test() {
             podman exec "${nested_container}" bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
             if podman exec "${nested_container}" test -d /cache; then
                 echo "Loading cached images into nested podman..."
-                for f in $(podman exec "${nested_container}" ls /cache/*.tar 2>/dev/null); do
-                    podman exec "${nested_container}" podman load -i "$f"
-                done
+                podman exec "${nested_container}" bash -c 'for f in /cache/*.tar; do [ -f "$f" ] && podman load -i "$f"; done'
                 echo "Images available in nested podman:"
                 podman exec "${nested_container}" podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
             fi
