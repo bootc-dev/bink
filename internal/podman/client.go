@@ -302,13 +302,17 @@ func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string) (
 		WithAttachOutput(true).
 		WithAttachError(true)
 
+	execCtx, execCancel := context.WithCancel(c.conn)
+	defer execCancel()
+
 	execErr := make(chan error, 1)
 	go func() {
-		execErr <- containers.ExecStartAndAttach(c.conn, sessionID, startOptions)
+		execErr <- containers.ExecStartAndAttach(execCtx, sessionID, startOptions)
 	}()
 
 	select {
 	case <-ctx.Done():
+		execCancel()
 		return "", fmt.Errorf("executing command: %w", ctx.Err())
 	case err := <-execErr:
 		if err != nil {
@@ -350,13 +354,17 @@ func (c *Client) ContainerExecQuiet(ctx context.Context, name string, cmd []stri
 		WithAttachOutput(true).
 		WithAttachError(true)
 
+	execCtx, execCancel := context.WithCancel(c.conn)
+	defer execCancel()
+
 	execErr := make(chan error, 1)
 	go func() {
-		execErr <- containers.ExecStartAndAttach(c.conn, sessionID, startOptions)
+		execErr <- containers.ExecStartAndAttach(execCtx, sessionID, startOptions)
 	}()
 
 	select {
 	case <-ctx.Done():
+		execCancel()
 		return fmt.Errorf("executing command: %w", ctx.Err())
 	case err := <-execErr:
 		if err != nil {
