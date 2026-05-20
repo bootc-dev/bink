@@ -1,0 +1,69 @@
+version = 1
+SPDX-PackageName = "bink"
+SPDX-PackageSupplier = "The bink Authors"
+
+[[annotations]]
+path = ["go.mod", "go.sum"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "internal/cluster/calico.yaml"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Project Calico Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "**.md"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ".gitignore"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ["Makefile", "node-images/fedora/Makefile"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ["Containerfile", "containerfiles/**", "node-images/fedora/Containerfile**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ".github/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "hack/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "internal/node/templates/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "internal/cluster/kubeadm-config.yaml.tmpl"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "test-cluster.sh"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"

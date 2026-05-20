@@ -1,4 +1,4 @@
-.PHONY: all build-bink build-bink-image build-cluster-image build-dns-image clean rebuild help test-integration test-integration-quick update-calico
+.PHONY: all build-bink build-bink-image build-cluster-image build-dns-image clean rebuild help test-integration test-integration-quick update-calico check-license
 
 # Extract image names and versions from internal/config/defaults.go (single source of truth)
 DEFAULTS_GO := internal/config/defaults.go
@@ -79,6 +79,11 @@ test-integration-quick:
 	@echo "=== Running Quick Integration Tests ==="
 	$(GINKGO) -v --focus="quick" test/integration/
 
+# Check REUSE/SPDX license compliance
+check-license:
+	@echo "=== Checking REUSE compliance ==="
+	reuse lint
+
 help:
 	@echo "Makefile for building bootc images, cluster images, and bink CLI"
 	@echo ""
@@ -95,6 +100,9 @@ help:
 	@echo ""
 	@echo "Maintenance Targets:"
 	@echo "  update-calico            - Fetch/update embedded Calico CNI manifest"
+	@echo ""
+	@echo "Check Targets:"
+	@echo "  check-license            - Verify all Go files have the Apache 2.0 license header"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test-integration         - Run all integration tests"
