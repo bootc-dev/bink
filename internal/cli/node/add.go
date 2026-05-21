@@ -25,6 +25,7 @@ func newAddCmd() *cobra.Command {
 	var role string
 	var memory int
 	var maxMemory int
+	var hostNetworkPopulator bool
 
 	cmd := &cobra.Command{
 		Use:   "add <node-name>",
@@ -33,7 +34,7 @@ func newAddCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, logger)
+			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, hostNetworkPopulator, logger)
 		},
 	}
 
@@ -42,11 +43,12 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&role, "role", "r", "worker", "Node role: worker or control-plane")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use role default: 1900 for control-plane, 768 for worker)")
 	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = use role default: 4096 for control-plane, 2048 for worker)")
+	cmd.Flags().BoolVar(&hostNetworkPopulator, "host-network-populator", false, "Use host networking for the image populator container (fixes DNS in nested podman)")
 
 	return cmd
 }
 
-func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, maxMemory int, logger *logrus.Logger) error {
+func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, logger *logrus.Logger) error {
 	// Validate and convert role to boolean
 	var isControlPlane bool
 	switch role {
@@ -74,9 +76,10 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	// Ensure images volume exists for this node image version
 	logger.Infof("Step 0: Ensuring cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{
-		Name:         clusterName,
-		ControlPlane: controlPlane,
-		Logger:       logger,
+		Name:                 clusterName,
+		ControlPlane:         controlPlane,
+		HostNetworkPopulator: hostNetworkPopulator,
+		Logger:               logger,
 	})
 
 	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)

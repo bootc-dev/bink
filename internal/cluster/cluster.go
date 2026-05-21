@@ -33,18 +33,20 @@ type PodmanClient interface {
 
 // Cluster represents a Kubernetes cluster
 type Cluster struct {
-	name         string
-	controlPlane string
-	logger       *logrus.Logger
-	podmanClient PodmanClient
+	name                 string
+	controlPlane         string
+	hostNetworkPopulator bool
+	logger               *logrus.Logger
+	podmanClient         PodmanClient
 }
 
 // Config holds cluster configuration
 type Config struct {
-	Name         string // Cluster name (default: "bink")
-	ControlPlane string // Control plane node name (default: "node1")
-	Logger       *logrus.Logger
-	PodmanClient PodmanClient
+	Name                 string // Cluster name (default: "bink")
+	ControlPlane         string // Control plane node name (default: "node1")
+	HostNetworkPopulator bool   // Use host networking for the image populator container
+	Logger               *logrus.Logger
+	PodmanClient         PodmanClient
 }
 
 // New creates a new Cluster
@@ -69,10 +71,11 @@ func New(cfg Config) *Cluster {
 	}
 
 	return &Cluster{
-		name:         cfg.Name,
-		controlPlane: cfg.ControlPlane,
-		logger:       cfg.Logger,
-		podmanClient: client,
+		name:                 cfg.Name,
+		controlPlane:         cfg.ControlPlane,
+		hostNetworkPopulator: cfg.HostNetworkPopulator,
+		logger:               cfg.Logger,
+		podmanClient:         client,
 	}
 }
 

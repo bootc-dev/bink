@@ -246,11 +246,16 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 		}
 		spec.Networks = opts.NetworkOptions
 	} else if opts.Network != "" {
-		spec.NetNS = specgen.Namespace{
-			NSMode: specgen.Bridge,
-		}
-		spec.Networks = map[string]nettypes.PerNetworkOptions{
-			opts.Network: {},
+		switch opts.Network {
+		case "host":
+			spec.NetNS = specgen.Namespace{NSMode: specgen.Host}
+		default:
+			spec.NetNS = specgen.Namespace{
+				NSMode: specgen.Bridge,
+			}
+			spec.Networks = map[string]nettypes.PerNetworkOptions{
+				opts.Network: {},
+			}
 		}
 	}
 
