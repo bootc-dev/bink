@@ -31,6 +31,22 @@ type Client struct {
 	connected  bool
 }
 
+type mergedContext struct {
+	context.Context
+	conn context.Context
+}
+
+func (m *mergedContext) Value(key any) any {
+	if v := m.conn.Value(key); v != nil {
+		return v
+	}
+	return m.Context.Value(key)
+}
+
+func (c *Client) withCtx(ctx context.Context) context.Context {
+	return &mergedContext{Context: ctx, conn: c.conn}
+}
+
 type ClientOption func(*Client)
 
 func NewClient(opts ...ClientOption) (*Client, error) {
@@ -93,7 +109,7 @@ func (c *Client) NetworkExists(ctx context.Context, name string) (bool, error) {
 		return false, err
 	}
 
-	_, err := network.Inspect(c.conn, name, nil)
+	_, err := network.Inspect(c.withCtx(ctx), name, nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such network") || strings.Contains(err.Error(), "network not found") {
 			return false, nil
@@ -122,7 +138,7 @@ func (c *Client) NetworkCreate(ctx context.Context, name, subnet string) error {
 		net.Subnets = []nettypes.Subnet{{Subnet: ipnet}}
 	}
 
-	_, err := network.Create(c.conn, net)
+	_, err := network.Create(c.withCtx(ctx), net)
 	if err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			logrus.Infof("Network '%s' already exists", name)
@@ -131,7 +147,7 @@ func (c *Client) NetworkCreate(ctx context.Context, name, subnet string) error {
 		if strings.Contains(err.Error(), "subnet") && strings.Contains(err.Error(), "use") {
 			logrus.Warnf("Subnet %s already in use, creating network with auto-assigned subnet", subnet)
 			net.Subnets = nil
-			_, err = network.Create(c.conn, net)
+			_, err = network.Create(c.withCtx(ctx), net)
 			if err != nil {
 				return fmt.Errorf("creating network with auto-assigned subnet: %w", err)
 			}
@@ -149,7 +165,7 @@ func (c *Client) NetworkInspect(ctx context.Context, name, format string) (strin
 		return "", err
 	}
 
-	report, err := network.Inspect(c.conn, name, nil)
+	report, err := network.Inspect(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return "", err
 	}
@@ -173,7 +189,7 @@ func (c *Client) NetworkRemove(ctx context.Context, name string) error {
 
 	logrus.Debugf("Removing network '%s'", name)
 
-	_, err := network.Remove(c.conn, name, nil)
+	_, err := network.Remove(c.withCtx(ctx), name, nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such network") || strings.Contains(err.Error(), "network not found") {
 			logrus.Debugf("Network '%s' does not exist", name)
@@ -191,7 +207,7 @@ func (c *Client) ContainerExists(ctx context.Context, name string) (bool, error)
 		return false, err
 	}
 
-	exists, err := containers.Exists(c.conn, name, nil)
+	exists, err := containers.Exists(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return false, err
 	}
@@ -239,13 +255,13 @@ func (c *Client) ContainerCreate(ctx context.Context, opts *ContainerCreateOptio
 	}
 
 	// Create the container
-	createResponse, err := containers.CreateWithSpec(c.conn, spec, nil)
+	createResponse, err := containers.CreateWithSpec(c.withCtx(ctx), spec, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating container: %w", err)
 	}
 
 	// Start the container
-	if err := containers.Start(c.conn, createResponse.ID, nil); err != nil {
+	if err := containers.Start(c.withCtx(ctx), createResponse.ID, nil); err != nil {
 		return "", fmt.Errorf("starting container: %w", err)
 	}
 
@@ -258,7 +274,7 @@ func (c *Client) ContainerStatus(ctx context.Context, name string) (string, erro
 		return "", err
 	}
 
-	data, err := containers.Inspect(c.conn, name, nil)
+	data, err := containers.Inspect(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return "", fmt.Errorf("inspecting container %s: %w", name, err)
 	}
@@ -273,7 +289,7 @@ func (c *Client) ContainerStart(ctx context.Context, name string) error {
 
 	logrus.Debugf("Starting container %s", name)
 
-	if err := containers.Start(c.conn, name, nil); err != nil {
+	if err := containers.Start(c.withCtx(ctx), name, nil); err != nil {
 		return fmt.Errorf("starting container %s: %w", name, err)
 	}
 
@@ -290,7 +306,7 @@ func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string) (
 	execConfig.AttachStdout = true
 	execConfig.AttachStderr = true
 
-	sessionID, err := containers.ExecCreate(c.conn, name, execConfig)
+	sessionID, err := containers.ExecCreate(c.withCtx(ctx), name, execConfig)
 	if err != nil {
 		return "", fmt.Errorf("creating exec session: %w", err)
 	}
@@ -302,7 +318,7 @@ func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string) (
 		WithAttachOutput(true).
 		WithAttachError(true)
 
-	execCtx, execCancel := context.WithCancel(c.conn)
+	execCtx, execCancel := context.WithCancel(c.withCtx(ctx))
 	defer execCancel()
 
 	execErr := make(chan error, 1)
@@ -320,7 +336,7 @@ func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string) (
 		}
 	}
 
-	inspectData, err := containers.ExecInspect(c.conn, sessionID, nil)
+	inspectData, err := containers.ExecInspect(c.withCtx(ctx), sessionID, nil)
 	if err != nil {
 		return "", fmt.Errorf("inspecting exec session: %w", err)
 	}
@@ -342,7 +358,7 @@ func (c *Client) ContainerExecQuiet(ctx context.Context, name string, cmd []stri
 	execConfig.AttachStdout = true
 	execConfig.AttachStderr = true
 
-	sessionID, err := containers.ExecCreate(c.conn, name, execConfig)
+	sessionID, err := containers.ExecCreate(c.withCtx(ctx), name, execConfig)
 	if err != nil {
 		return fmt.Errorf("creating exec session: %w", err)
 	}
@@ -354,7 +370,7 @@ func (c *Client) ContainerExecQuiet(ctx context.Context, name string, cmd []stri
 		WithAttachOutput(true).
 		WithAttachError(true)
 
-	execCtx, execCancel := context.WithCancel(c.conn)
+	execCtx, execCancel := context.WithCancel(c.withCtx(ctx))
 	defer execCancel()
 
 	execErr := make(chan error, 1)
@@ -372,7 +388,7 @@ func (c *Client) ContainerExecQuiet(ctx context.Context, name string, cmd []stri
 		}
 	}
 
-	inspectData, err := containers.ExecInspect(c.conn, sessionID, nil)
+	inspectData, err := containers.ExecInspect(c.withCtx(ctx), sessionID, nil)
 	if err != nil {
 		return fmt.Errorf("inspecting exec session: %w", err)
 	}
@@ -398,7 +414,7 @@ func (c *Client) ContainerExecInteractive(ctx context.Context, name string, cmd 
 	execConfig.AttachStdin = true
 	execConfig.Tty = true
 
-	sessionID, err := containers.ExecCreate(c.conn, name, execConfig)
+	sessionID, err := containers.ExecCreate(c.withCtx(ctx), name, execConfig)
 	if err != nil {
 		return fmt.Errorf("creating exec session: %w", err)
 	}
@@ -412,7 +428,7 @@ func (c *Client) ContainerExecInteractive(ctx context.Context, name string, cmd 
 		WithAttachError(true).
 		WithAttachInput(true)
 
-	if err := containers.ExecStartAndAttach(c.conn, sessionID, startOptions); err != nil {
+	if err := containers.ExecStartAndAttach(c.withCtx(ctx), sessionID, startOptions); err != nil {
 		return fmt.Errorf("executing command: %w", err)
 	}
 
@@ -429,7 +445,7 @@ func (c *Client) ContainerStop(ctx context.Context, name string) error {
 	timeout := uint(10)
 	opts := new(containers.StopOptions).WithTimeout(timeout)
 
-	if err := containers.Stop(c.conn, name, opts); err != nil {
+	if err := containers.Stop(c.withCtx(ctx), name, opts); err != nil {
 		return fmt.Errorf("stopping container %s: %w", name, err)
 	}
 
@@ -445,7 +461,7 @@ func (c *Client) ContainerRemove(ctx context.Context, name string, force bool) e
 
 	opts := new(containers.RemoveOptions).WithForce(force)
 
-	if _, err := containers.Remove(c.conn, name, opts); err != nil {
+	if _, err := containers.Remove(c.withCtx(ctx), name, opts); err != nil {
 		return fmt.Errorf("removing container %s: %w", name, err)
 	}
 
@@ -468,7 +484,7 @@ func (c *Client) ContainerList(ctx context.Context, filter string) ([]string, er
 		}
 	}
 
-	containerList, err := containers.List(c.conn, opts)
+	containerList, err := containers.List(c.withCtx(ctx), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +504,7 @@ func (c *Client) ContainerInspect(ctx context.Context, name, format string) (str
 		return "", err
 	}
 
-	data, err := containers.Inspect(c.conn, name, nil)
+	data, err := containers.Inspect(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return "", err
 	}
@@ -587,7 +603,7 @@ func (c *Client) ContainerCopy(ctx context.Context, srcPath, containerName, dest
 	}
 
 	// Copy to container using bindings
-	copyFunc, err := containers.CopyFromArchive(c.conn, containerName, filepath.Dir(destPath), &buf)
+	copyFunc, err := containers.CopyFromArchive(c.withCtx(ctx), containerName, filepath.Dir(destPath), &buf)
 	if err != nil {
 		return fmt.Errorf("preparing copy: %w", err)
 	}
@@ -625,7 +641,7 @@ func (c *Client) ContainerCopyContent(ctx context.Context, content []byte, conta
 		return fmt.Errorf("closing tar writer: %w", err)
 	}
 
-	copyFunc, err := containers.CopyFromArchive(c.conn, containerName, filepath.Dir(destPath), &buf)
+	copyFunc, err := containers.CopyFromArchive(c.withCtx(ctx), containerName, filepath.Dir(destPath), &buf)
 	if err != nil {
 		return fmt.Errorf("preparing copy: %w", err)
 	}
@@ -644,7 +660,7 @@ func (c *Client) VolumeRemove(ctx context.Context, name string) error {
 
 	logrus.Debugf("Removing volume %s", name)
 
-	if err := volumes.Remove(c.conn, name, nil); err != nil {
+	if err := volumes.Remove(c.withCtx(ctx), name, nil); err != nil {
 		return fmt.Errorf("removing volume %s: %w", name, err)
 	}
 
@@ -656,7 +672,7 @@ func (c *Client) VolumeExists(ctx context.Context, name string) (bool, error) {
 		return false, err
 	}
 
-	_, err := volumes.Inspect(c.conn, name, nil)
+	_, err := volumes.Inspect(c.withCtx(ctx), name, nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such volume") || strings.Contains(err.Error(), "volume not found") {
 			return false, nil
@@ -677,7 +693,7 @@ func (c *Client) VolumeCreate(ctx context.Context, name string, labels map[strin
 		Name:   name,
 		Labels: labels,
 	}
-	_, err := volumes.Create(c.conn, opts, nil)
+	_, err := volumes.Create(c.withCtx(ctx), opts, nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "volume already exists") {
 			logrus.Debugf("Volume %s already exists (created by parallel process)", name)
@@ -695,7 +711,7 @@ func (c *Client) VolumeInspectLabels(ctx context.Context, name string) (map[stri
 		return nil, err
 	}
 
-	data, err := volumes.Inspect(c.conn, name, nil)
+	data, err := volumes.Inspect(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return nil, fmt.Errorf("inspecting volume %s: %w", name, err)
 	}
@@ -708,7 +724,7 @@ func (c *Client) ImageInspectLabels(ctx context.Context, name string) (map[strin
 		return nil, err
 	}
 
-	data, err := images.GetImage(c.conn, name, nil)
+	data, err := images.GetImage(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return nil, fmt.Errorf("inspecting image %s: %w", name, err)
 	}
@@ -735,7 +751,7 @@ func (c *Client) VolumeList(ctx context.Context, filter string) ([]string, error
 		}
 	}
 
-	volumeList, err := volumes.List(c.conn, opts)
+	volumeList, err := volumes.List(c.withCtx(ctx), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -770,7 +786,7 @@ func (c *Client) ImagePull(ctx context.Context, rawImage string, skipTLSVerify b
 	}
 
 	opts := new(images.PullOptions).WithQuiet(true).WithSkipTLSVerify(skipTLSVerify)
-	pulled, err := images.Pull(c.conn, rawImage, opts)
+	pulled, err := images.Pull(c.withCtx(ctx), rawImage, opts)
 	if err != nil {
 		return nil, fmt.Errorf("pulling image %s: %w", rawImage, err)
 	}
@@ -783,7 +799,7 @@ func (c *Client) ImageTag(ctx context.Context, nameOrID, tag, repo string) error
 		return err
 	}
 
-	if err := images.Tag(c.conn, nameOrID, tag, repo, nil); err != nil {
+	if err := images.Tag(c.withCtx(ctx), nameOrID, tag, repo, nil); err != nil {
 		return fmt.Errorf("tagging image %s: %w", nameOrID, err)
 	}
 
@@ -796,7 +812,7 @@ func (c *Client) ImagePush(ctx context.Context, source, destination string, skip
 	}
 
 	opts := new(images.PushOptions).WithQuiet(true).WithSkipTLSVerify(skipTLSVerify)
-	if err := images.Push(c.conn, source, destination, opts); err != nil {
+	if err := images.Push(c.withCtx(ctx), source, destination, opts); err != nil {
 		return fmt.Errorf("pushing image %s to %s: %w", source, destination, err)
 	}
 
@@ -809,7 +825,7 @@ func (c *Client) ImageRemove(ctx context.Context, names []string, force bool) er
 	}
 
 	opts := new(images.RemoveOptions).WithForce(force)
-	_, errs := images.Remove(c.conn, names, opts)
+	_, errs := images.Remove(c.withCtx(ctx), names, opts)
 	for _, err := range errs {
 		if err != nil {
 			return fmt.Errorf("removing images: %w", err)
@@ -824,7 +840,7 @@ func (c *Client) ImageExists(ctx context.Context, name string) (bool, error) {
 		return false, err
 	}
 
-	exists, err := images.Exists(c.conn, name, nil)
+	exists, err := images.Exists(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return false, err
 	}
@@ -838,7 +854,7 @@ func (c *Client) ContainerWait(ctx context.Context, name string) (int64, error) 
 
 	logrus.Debugf("Waiting for container %s to exit...", name)
 
-	exitCode, err := containers.Wait(c.conn, name, nil)
+	exitCode, err := containers.Wait(c.withCtx(ctx), name, nil)
 	if err != nil {
 		return 0, fmt.Errorf("waiting for container: %w", err)
 	}
@@ -869,16 +885,16 @@ func (c *Client) ContainerRunQuiet(ctx context.Context, image string, cmd []stri
 		}
 	}
 
-	createResponse, err := containers.CreateWithSpec(c.conn, spec, nil)
+	createResponse, err := containers.CreateWithSpec(c.withCtx(ctx), spec, nil)
 	if err != nil {
 		return fmt.Errorf("creating container: %w", err)
 	}
 
-	if err := containers.Start(c.conn, createResponse.ID, nil); err != nil {
+	if err := containers.Start(c.withCtx(ctx), createResponse.ID, nil); err != nil {
 		return fmt.Errorf("starting container: %w", err)
 	}
 
-	exitCode, err := containers.Wait(c.conn, createResponse.ID, nil)
+	exitCode, err := containers.Wait(c.withCtx(ctx), createResponse.ID, nil)
 	if err != nil {
 		return fmt.Errorf("waiting for container: %w", err)
 	}
@@ -895,7 +911,7 @@ func (c *Client) GetPublishedPort(ctx context.Context, containerName, containerP
 		return 0, err
 	}
 
-	data, err := containers.Inspect(c.conn, containerName, nil)
+	data, err := containers.Inspect(c.withCtx(ctx), containerName, nil)
 	if err != nil {
 		return 0, fmt.Errorf("inspecting container: %w", err)
 	}
