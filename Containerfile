@@ -19,11 +19,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 # Copy source and build
+ARG VERSION=dev
 COPY . /src
 WORKDIR /output
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    cd /src && CGO_ENABLED=1 go build -o /output/bink ./cmd/bink
+    GIT_COMMIT=$(cd /src && git rev-parse --short HEAD 2>/dev/null || echo "") && \
+    BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) && \
+    VERSION_PKG=github.com/bootc-dev/bink/internal/version && \
+    cd /src && CGO_ENABLED=1 go build \
+    -ldflags "-X ${VERSION_PKG}.Version=${VERSION} -X ${VERSION_PKG}.GitCommit=${GIT_COMMIT} -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}" \
+    -o /output/bink ./cmd/bink
 
 # Runtime image with just the binary and required C runtime libraries
 FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION}

@@ -12,6 +12,15 @@ FEDORA_VERSION := $(call extract,FedoraVersion )
 # Binary
 BINK_BINARY := bink
 
+# Version info (overridable, e.g. make build-bink VERSION=v0.1.0)
+VERSION ?= dev
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+VERSION_PKG := github.com/bootc-dev/bink/internal/version
+LDFLAGS := -X $(VERSION_PKG).Version=$(VERSION) \
+           -X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) \
+           -X $(VERSION_PKG).BuildDate=$(BUILD_DATE)
+
 # Directories
 VM_DIR := containerfiles/cluster-image
 
@@ -20,14 +29,15 @@ all: build-bink
 # Build the bink CLI binary
 build-bink:
 	@echo "=== Building bink CLI binary ==="
-	go build -o $(BINK_BINARY) ./cmd/bink
+	go build -ldflags "$(LDFLAGS)" -o $(BINK_BINARY) ./cmd/bink
 	@echo "✅ bink binary built: $(BINK_BINARY)"
+
 
 # Build the bink CLI container image
 build-bink-image:
 	@echo "=== Building bink CLI container image ==="
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --target builder -t localhost/bink-builder:latest -f Containerfile .
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(BINK_IMAGE) -f Containerfile .
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg VERSION=$(VERSION) --target builder -t localhost/bink-builder:latest -f Containerfile .
+	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg VERSION=$(VERSION) -t $(BINK_IMAGE) -f Containerfile .
 	@echo "✅ Bink CLI image built: $(BINK_IMAGE)"
 
 # Build the cluster container image
