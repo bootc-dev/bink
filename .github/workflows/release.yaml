@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+
+      - name: Build bink binary
+        run: |
+          podman build --build-arg VERSION=${{ steps.version.outputs.version }} \
+            --target builder -t localhost/bink-builder:latest -f Containerfile .
+          podman create --name bink-builder-tmp localhost/bink-builder:latest
+          podman cp bink-builder-tmp:/output/bink ./bink
+          podman rm bink-builder-tmp
+          chmod +x ./bink
+          ./bink version
+
+      - name: Build and push bink image
+        run: |
+          make build-bink-image VERSION=${{ steps.version.outputs.version }}
+          podman tag ${{ env.REGISTRY }}/${{ github.repository }}/bink:latest \
+            ${{ env.REGISTRY }}/${{ github.repository }}/bink:${{ steps.version.outputs.version }}
+          podman push ${{ env.REGISTRY }}/${{ github.repository }}/bink:${{ steps.version.outputs.version }}
+          podman push ${{ env.REGISTRY }}/${{ github.repository }}/bink:latest
+
+      - name: Build and push cluster image
+        run: |
+          make build-cluster-image
+          podman tag ${{ env.REGISTRY }}/${{ github.repository }}/cluster:latest \
+            ${{ env.REGISTRY }}/${{ github.repository }}/cluster:${{ steps.version.outputs.version }}
+          podman push ${{ env.REGISTRY }}/${{ github.repository }}/cluster:${{ steps.version.outputs.version }}
+          podman push ${{ env.REGISTRY }}/${{ github.repository }}/cluster:latest
+
+      - name: Build and push dns image
+        run: |
+          make build-dns-image
+          podman tag ${{ env.REGISTRY }}/${{ github.repository }}/dns:latest \
+            ${{ env.REGISTRY }}/${{ github.repository }}/dns:${{ steps.version.outputs.version }}
+          podman push ${{ env.REGISTRY }}/${{ github.repository }}/dns:${{ steps.version.outputs.version }}
+          podman push ${{ env.REGISTRY }}/${{ github.repository }}/dns:latest
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.version.outputs.version }} \
+            ./bink \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes
