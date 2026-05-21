@@ -15,6 +15,12 @@ concurrency:
   group: container-image-test-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+env:
+  BINK_RUNTIME_IMAGES: >-
+    ghcr.io/alicefr/bink/cluster:latest
+    ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk
+    ghcr.io/alicefr/bink/dns:latest
+
 jobs:
   test-container-image:
     runs-on: ubuntu-latest
@@ -52,12 +58,58 @@ jobs:
           sudo systemctl start podman.socket
           sudo podman info --format '{{.Store.GraphRoot}}'
 
+      - name: Get runtime image digests
+        id: digests
+        run: |
+          ALL_DIGESTS=""
+          for img in $BINK_RUNTIME_IMAGES; do
+            digest=$(skopeo inspect --no-creds "docker://${img}" --format '{{.Digest}}')
+            echo "${img}: ${digest}"
+            ALL_DIGESTS="${ALL_DIGESTS}${digest}"
+          done
+          echo "hash=$(echo -n "${ALL_DIGESTS}" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore cached images
+        id: image-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/podman-image-cache
+          key: podman-images-v2-container-test-${{ steps.digests.outputs.hash }}
+
+      - name: Load cached images
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: |
+          for f in /tmp/podman-image-cache/*.tar; do
+            sudo podman load -i "$f"
+          done
+          sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+
+      - name: Pre-pull runtime images
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/podman-image-cache
+          for img in $BINK_RUNTIME_IMAGES; do
+            sudo podman pull "$img"
+            name=$(echo "$img" | sed 's|[/:]|_|g')
+            sudo podman save -o "/tmp/podman-image-cache/${name}.tar" "$img"
+          done
+          sudo chown -R $(id -u):$(id -g) /tmp/podman-image-cache
+
+      - name: Save image cache
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/podman-image-cache
+          key: podman-images-v2-container-test-${{ steps.digests.outputs.hash }}
+
       - name: Build bink image
         run: sudo make build-bink-image
 
       - name: Test nested mode
-        run: sudo hack/test-container-image.sh nested
+        run: sudo -E hack/test-container-image.sh nested
         timeout-minutes: 40
+        env:
+          IMAGE_CACHE_DIR: /tmp/podman-image-cache
 
       - name: Test socket mode
         run: sudo hack/test-container-image.sh socket
