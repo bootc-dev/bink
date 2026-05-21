@@ -12,6 +12,7 @@ import (
 	"github.com/bootc-dev/bink/internal/cli/node"
 	"github.com/bootc-dev/bink/internal/cli/registry"
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/bootc-dev/bink/internal/version"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -65,6 +66,13 @@ func init() {
 	rootCmd.AddCommand(node.NewNodeCmd())
 	rootCmd.AddCommand(api.NewAPICmd())
 	rootCmd.AddCommand(registry.NewRegistryCmd())
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print the version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(version.Print())
+		},
+	})
 }
 
 func initConfig() {
