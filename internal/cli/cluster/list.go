@@ -22,6 +22,8 @@ func newListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all clusters",
 		Long:  "List all running clusters and their node counts",
+		Example: `  # List all clusters and their status
+  bink cluster list`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
 			return runClusterList(cmd.Context(), logger, nameOnly)

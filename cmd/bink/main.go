@@ -31,8 +31,30 @@ var rootCmd = &cobra.Command{
 	Long: `bink is a CLI tool for managing containerized Kubernetes clusters
 where each node is a Podman container running a VM inside.
 
-It replaces the shell scripts in the bootc-operator project with a
-well-structured Go application that's easier to maintain and extend.`,
+Each cluster node is a Podman container running libvirt/QEMU with a
+Fedora bootc VM and kubeadm-managed Kubernetes.
+
+Common workflows:
+
+  # Create a cluster and get a kubeconfig in one step
+  bink cluster start --expose ./kubeconfig
+  export KUBECONFIG=./kubeconfig
+  kubectl get nodes
+
+  # Create a cluster, then expose separately
+  bink cluster start --cluster-name dev
+  bink api expose --cluster-name dev
+  export KUBECONFIG=./kubeconfig-dev
+
+  # Add worker nodes
+  bink node add node2
+  bink node add node3 --memory 4096
+
+  # SSH into a node
+  bink node ssh node1
+
+  # Tear down
+  bink cluster stop --remove-data`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if debug {
 			logrus.SetLevel(logrus.DebugLevel)

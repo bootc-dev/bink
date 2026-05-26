@@ -20,8 +20,13 @@ func newSSHCmd() *cobra.Command {
 		Use:   "ssh <node-name>",
 		Short: "SSH into a node's VM",
 		Long:  "Start an interactive SSH session to a node's VM",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runSSH,
+		Example: `  # SSH into the control-plane node
+  bink node ssh node1
+
+  # SSH into a worker node in a named cluster
+  bink node ssh node2 --cluster-name dev`,
+		Args: cobra.ExactArgs(1),
+		RunE: runSSH,
 	}
 
 	return cmd
