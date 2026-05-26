@@ -4,9 +4,9 @@
 DEFAULTS_GO := internal/config/defaults.go
 extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
 
-BINK_IMAGE := $(call extract,BinkImage )
-CLUSTER_IMAGE := $(call extract,DefaultClusterImage )
-DNS_IMAGE := $(call extract,DNSImage )
+BINK_IMAGE := $(call extract,binkImageBase ):latest
+CLUSTER_IMAGE := $(call extract,clusterImageBase ):latest
+DNS_IMAGE := $(call extract,dnsImageBase ):latest
 FEDORA_VERSION := $(call extract,FedoraVersion )
 
 # Binary

@@ -3,15 +3,19 @@
 
 package config
 
+import "github.com/bootc-dev/bink/internal/version"
+
 const (
 	DefaultNetworkName = "podman"
 	DefaultSubnet      = "10.88.0.0/16"
 
 	FedoraVersion = "43"
 
-	BinkImage           = "ghcr.io/alicefr/bink/bink:latest"
-	DefaultClusterImage = "ghcr.io/alicefr/bink/cluster:latest"
-	DefaultNodeImage    = "ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk"
+	binkImageBase    = "ghcr.io/alicefr/bink/bink"
+	clusterImageBase = "ghcr.io/alicefr/bink/cluster"
+	dnsImageBase     = "ghcr.io/alicefr/bink/dns"
+
+	DefaultNodeImage = "ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk"
 
 	DefaultBaseDisk = "/images/disk.qcow2"
 	DefaultControlPlaneMemory    = 1900
@@ -50,7 +54,6 @@ const (
 	ContainerNamePrefix = "k8s-"
 
 	DNSContainerName = "dns"
-	DNSImage         = "ghcr.io/alicefr/bink/dns:latest"
 	DNSMasqHostsFile = "/var/lib/dnsmasq/cluster-hosts"
 	DNSMasqConfigDir = "/etc/dnsmasq.d"
 	ClusterDomain    = "cluster.local"
@@ -79,3 +82,16 @@ const (
 
 	DefaultImagePullTimeout = 600
 )
+
+var (
+	BinkImage           = binkImageBase + ":" + imageTag()
+	DefaultClusterImage = clusterImageBase + ":" + imageTag()
+	DNSImage            = dnsImageBase + ":" + imageTag()
+)
+
+func imageTag() string {
+	if version.Version == "" || version.Version == "dev" {
+		return "latest"
+	}
+	return version.Version
+}
