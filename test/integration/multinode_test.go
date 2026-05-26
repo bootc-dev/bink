@@ -43,8 +43,8 @@ var _ = Describe("Multi-Node Clusters", func() {
 		kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
 		defer helpers.CleanupKubeconfig(kubeconfigPath)
 
-		By("Adding first worker node")
-		helpers.AddNode(clusterName, node2, "--role", "worker")
+		By("Adding first worker node with labels")
+		helpers.AddNode(clusterName, node2, "--role", "worker", "--label", "env=test1")
 
 		By("Verifying node2 container is running")
 		containerName2 := helpers.NodeContainerName(clusterName, node2)
@@ -52,27 +52,12 @@ var _ = Describe("Multi-Node Clusters", func() {
 		Expect(container2).ToNot(BeNil(), "Container %s should exist", containerName2)
 		Expect(container2.State).To(Equal("running"), "Container should be running")
 
-		By("Verifying node2 joined Kubernetes with worker role")
+		By("Verifying node2 joined Kubernetes with worker role and custom labels")
 		helpers.WaitForNodeReady(kubeClient, node2, 5*time.Minute)
 		n2, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node2, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		hasWorkerRole := false
-		for key := range n2.Labels {
-			if key == "node-role.kubernetes.io/worker" {
-				hasWorkerRole = true
-				break
-			}
-		}
-		hasControlPlaneRole := false
-		for key := range n2.Labels {
-			if key == "node-role.kubernetes.io/control-plane" {
-				hasControlPlaneRole = true
-				break
-			}
-		}
-		Expect(hasControlPlaneRole).To(BeFalse(), "node2 should not have control-plane role")
-		// Worker role label may not be set by kubeadm by default, so just verify it's not control-plane
-		_ = hasWorkerRole
+		Expect(n2.Labels).ToNot(HaveKey("node-role.kubernetes.io/control-plane"), "node2 should not have control-plane role")
+		Expect(n2.Labels).To(HaveKeyWithValue("env", "test1"), "node2 should have label env=test1")
 
 		By("Verifying DNS entry for node2")
 		hostsFile := helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
@@ -85,8 +70,8 @@ var _ = Describe("Multi-Node Clusters", func() {
 		Expect(listOutput).To(ContainSubstring(node1), "node list should contain node1")
 		Expect(listOutput).To(ContainSubstring(node2), "node list should contain node2")
 
-		By("Adding second worker node")
-		helpers.AddNode(clusterName, node3, "--role", "worker")
+		By("Adding second worker node with different labels")
+		helpers.AddNode(clusterName, node3, "--role", "worker", "--label", "env=test2")
 
 		By("Verifying all three containers are running")
 		for _, nodeName := range []string{node1, node2, node3} {
@@ -111,6 +96,11 @@ var _ = Describe("Multi-Node Clusters", func() {
 			}
 			Expect(ready).To(BeTrue(), "Node %s should be Ready", node.Name)
 		}
+
+		By("Verifying custom labels on node3")
+		n3, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node3, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(n3.Labels).To(HaveKeyWithValue("env", "test2"), "node3 should have label env=test2")
 
 		By("Verifying DNS entries for all nodes")
 		hostsFile = helpers.PodmanExec(helpers.DNSContainerName(clusterName), "cat /var/lib/dnsmasq/cluster-hosts")
