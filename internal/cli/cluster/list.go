@@ -6,6 +6,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -16,15 +17,17 @@ import (
 )
 
 func newListCmd() *cobra.Command {
+	var nameOnly bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all clusters",
 		Long:  "List all running clusters and their node counts",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runClusterList(cmd.Context(), logger)
+			return runClusterList(cmd.Context(), logger, nameOnly)
 		},
 	}
+	cmd.Flags().BoolVar(&nameOnly, "name-only", false, "Only print cluster names, one per line")
 
 	return cmd
 }
@@ -36,7 +39,7 @@ type clusterInfo struct {
 	stoppedCount int
 }
 
-func runClusterList(ctx context.Context, logger *logrus.Logger) error {
+func runClusterList(ctx context.Context, logger *logrus.Logger, nameOnly bool) error {
 	podmanClient, err := podman.NewClient()
 	if err != nil {
 		return fmt.Errorf("creating podman client: %w", err)
@@ -108,6 +111,18 @@ func runClusterList(ctx context.Context, logger *logrus.Logger) error {
 		} else {
 			cluster.stoppedCount++
 		}
+	}
+
+	if nameOnly {
+		names := make([]string, 0, len(clusters))
+		for name := range clusters {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Println(name)
+		}
+		return nil
 	}
 
 	// Display clusters
