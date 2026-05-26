@@ -19,6 +19,7 @@ type JoinOptions struct {
 	IsControlPlane bool
 	NodeClusterIP  string
 	Timeout        time.Duration
+	Labels         map[string]string
 }
 
 // Join joins a node to the cluster
@@ -87,21 +88,28 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 		}
 	}
 
-	// Label worker nodes with the worker role
+	// Label nodes (role label applied last to prevent user override)
+	labels := make(map[string]string)
+	for k, v := range opts.Labels {
+		labels[k] = v
+	}
 	if !opts.IsControlPlane {
+		labels["node-role.kubernetes.io/worker"] = "worker"
+	}
+
+	if len(labels) > 0 {
 		c.logger.Info("")
-		c.logger.Infof("=== Labeling %s as worker ===", nodeName)
+		c.logger.Infof("=== Labeling %s ===", nodeName)
 
 		containerName := fmt.Sprintf("k8s-%s-%s", c.name, controlPlane)
 		kubeClient, err := c.newKubeClient(ctx, cpSSHClient, containerName)
 		if err != nil {
 			c.logger.Warnf("Failed to create kubernetes client (non-fatal): %v", err)
 		} else {
-			labels := map[string]string{"node-role.kubernetes.io/worker": "worker"}
 			if err := kubeClient.LabelNode(ctx, nodeName, labels); err != nil {
-				c.logger.Warnf("Failed to label node as worker (non-fatal): %v", err)
+				c.logger.Warnf("Failed to label node (non-fatal): %v", err)
 			} else {
-				c.logger.Infof("✅ Node %s labeled as worker", nodeName)
+				c.logger.Infof("✅ Node %s labeled", nodeName)
 			}
 		}
 	}
