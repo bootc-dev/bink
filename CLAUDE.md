@@ -10,7 +10,7 @@ The bink binary requires CGO and C libraries (gpgme, btrfs, device-mapper) for P
 
 ```bash
 # Build the binary inside a container (recommended, always use this)
-make build-bink-container
+make build-bink-image
 ```
 
 This runs a two-stage process:
@@ -248,7 +248,7 @@ Host (podman)
 
 ```bash
 # Integration tests (requires built bink binary and container images)
-make build-bink-container    # build binary first
+make build-bink-image    # build binary first
 make test-integration        # full suite
 make test-integration-quick  # quick tests only
 ```
