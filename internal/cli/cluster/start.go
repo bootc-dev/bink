@@ -33,6 +33,14 @@ func newStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start a new Kubernetes cluster",
 		Long:  "Create network, control plane node, and initialize Kubernetes cluster with kubeadm",
+		Example: `  # Start a cluster with default settings
+  bink cluster start
+
+  # Start a named cluster with auto-assigned API port
+  bink cluster start --cluster-name dev --api-port 0
+
+  # Start a cluster with more memory and auto-expose the API
+  bink cluster start --memory 4096 --expose ./kubeconfig`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
 			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath)

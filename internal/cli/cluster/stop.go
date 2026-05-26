@@ -26,6 +26,14 @@ func newStopCmd() *cobra.Command {
 		Use:   "stop",
 		Short: "Stop the cluster",
 		Long:  "Stop and remove all cluster nodes",
+		Example: `  # Stop the default cluster
+  bink cluster stop
+
+  # Stop a named cluster
+  bink cluster stop --cluster-name dev
+
+  # Stop and remove all data (volumes, kubeconfig, SSH keys)
+  bink cluster stop --cluster-name dev --remove-data`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
 			return runStop(cmd.Context(), logger, force, removeData)

@@ -30,7 +30,15 @@ func newAddCmd() *cobra.Command {
 		Use:   "add <node-name>",
 		Short: "Add a node to the cluster",
 		Long:  "Create a new node (worker or control-plane) and join it to the Kubernetes cluster",
-		Args:  cobra.ExactArgs(1),
+		Example: `  # Add a worker node
+  bink node add node2
+
+  # Add a worker node with more memory
+  bink node add node2 --memory 4096
+
+  # Add a control-plane node
+  bink node add node2 --role control-plane`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
 			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, logger)
