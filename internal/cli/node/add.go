@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -26,6 +27,7 @@ func newAddCmd() *cobra.Command {
 	var memory int
 	var maxMemory int
 	var hostNetworkPopulator bool
+	var labelFlags []string
 
 	cmd := &cobra.Command{
 		Use:   "add <node-name>",
@@ -41,8 +43,12 @@ func newAddCmd() *cobra.Command {
   bink node add node2 --role control-plane`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			labels, err := parseLabels(labelFlags)
+			if err != nil {
+				return err
+			}
 			logger := logrus.New()
-			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, hostNetworkPopulator, logger)
+			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, hostNetworkPopulator, labels, logger)
 		},
 	}
 
@@ -52,11 +58,32 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use role default: 1900 for control-plane, 768 for worker)")
 	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = use role default: 4096 for control-plane, 2048 for worker)")
 	cmd.Flags().BoolVar(&hostNetworkPopulator, "host-network-populator", false, "Use host networking for the image populator container (fixes DNS in nested podman)")
+	cmd.Flags().StringArrayVarP(&labelFlags, "label", "l", nil, "Node label in key=value format (can be specified multiple times)")
 
 	return cmd
 }
 
-func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, logger *logrus.Logger) error {
+func parseLabels(labelFlags []string) (map[string]string, error) {
+	labels := make(map[string]string, len(labelFlags))
+	for _, l := range labelFlags {
+		k, v, ok := strings.Cut(l, "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("invalid label %q: must be in key=value format", l)
+		}
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if k == "" {
+			return nil, fmt.Errorf("invalid label %q: key must not be empty", l)
+		}
+		if _, exists := labels[k]; exists {
+			return nil, fmt.Errorf("duplicate label key %q", k)
+		}
+		labels[k] = v
+	}
+	return labels, nil
+}
+
+func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, labels map[string]string, logger *logrus.Logger) error {
 	// Validate and convert role to boolean
 	var isControlPlane bool
 	switch role {
@@ -170,6 +197,7 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		ControlPlane:   controlPlane,
 		IsControlPlane: isControlPlane,
 		NodeClusterIP:  newNode.ClusterIP,
+		Labels:         labels,
 	}); err != nil {
 		return fmt.Errorf("joining node to cluster: %w", err)
 	}
