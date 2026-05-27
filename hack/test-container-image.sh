@@ -90,9 +90,11 @@ run_test() {
     "${bink_args[@]}" --help
 
     echo "--- bink cluster start ---"
-    local verbose_flag=""
-    [ "${mode}" = "nested" ] && verbose_flag="-v"
-    "${bink_args[@]}" cluster start --cluster-name "${cluster_name}" --api-port 0 ${verbose_flag}
+    local start_extra_flags=""
+    if [ "${mode}" = "nested" ]; then
+        start_extra_flags="-v --host-network-populator"
+    fi
+    "${bink_args[@]}" cluster start --cluster-name "${cluster_name}" --api-port 0 ${start_extra_flags}
 
     echo "--- bink api expose ---"
     "${bink_args[@]}" api expose --cluster-name "${cluster_name}"

@@ -191,9 +191,13 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 			Destination: "/images",
 		}},
 		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
-		CapAdd:  []string{"SYS_ADMIN"},
-		Devices: []specs.LinuxDevice{{Path: "/dev/fuse"}},
+		CapAdd:      []string{"SYS_ADMIN"},
+		Devices:     []specs.LinuxDevice{{Path: "/dev/fuse"}},
 		SelinuxOpts: []string{"disable"},
+	}
+
+	if c.hostNetworkPopulator {
+		opts.Network = "host"
 	}
 
 	_, err := c.podmanClient.ContainerCreate(ctx, opts)

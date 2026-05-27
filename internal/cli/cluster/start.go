@@ -28,6 +28,7 @@ func newStartCmd() *cobra.Command {
 	var memory int
 	var maxMemory int
 	var exposePath string
+	var hostNetworkPopulator bool
 
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -43,7 +44,7 @@ func newStartCmd() *cobra.Command {
   bink cluster start --memory 4096 --expose ./kubeconfig`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath)
+			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath, hostNetworkPopulator)
 		},
 	}
 
@@ -53,11 +54,12 @@ func newStartCmd() *cobra.Command {
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use role default: 1900 for control-plane, 768 for worker)")
 	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = use role default: 4096 for control-plane, 2048 for worker)")
 	cmd.Flags().StringVar(&exposePath, "expose", "", "Expose API and save kubeconfig to PATH after cluster is up")
+	cmd.Flags().BoolVar(&hostNetworkPopulator, "host-network-populator", false, "Use host networking for the image populator container (fixes DNS in nested podman)")
 
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string, hostNetworkPopulator bool) error {
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -110,9 +112,10 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 
 	logger.Info("Step 5: Preparing cluster images volume...")
 	clusterMgr := cluster.New(cluster.Config{
-		Name:         clusterName,
-		ControlPlane: nodeName,
-		Logger:       logger,
+		Name:                 clusterName,
+		ControlPlane:         nodeName,
+		HostNetworkPopulator: hostNetworkPopulator,
+		Logger:               logger,
 	})
 
 	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)
