@@ -50,6 +50,14 @@ func CreateCluster(name string) {
 	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
 }
 
+// CreateClusterWithNodeName creates a cluster with a custom control-plane node name
+func CreateClusterWithNodeName(name, nodeName string) {
+	GinkgoWriter.Printf("Creating cluster: %s with node name: %s (with auto-assigned API port)\n", name, nodeName)
+	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--node-name", nodeName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096")
+	session := RunCommand(cmd, 10*time.Minute)
+	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
+}
+
 // AddNode adds a node to the cluster
 func AddNode(clusterName, nodeName string, extraArgs ...string) {
 	GinkgoWriter.Printf("Adding node %s to cluster %s\n", nodeName, clusterName)
