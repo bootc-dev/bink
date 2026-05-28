@@ -134,6 +134,31 @@ var _ = Describe("Multi-Node Clusters", func() {
 		}
 	})
 
+	It("should add worker node when cluster uses custom node name", func() {
+		const customNodeName = "cp-custom"
+
+		By("Creating a cluster with a custom control-plane node name")
+		helpers.CreateClusterWithNodeName(clusterName, customNodeName)
+
+		By("Verifying control-plane container has the custom name")
+		containerName := helpers.NodeContainerName(clusterName, customNodeName)
+		container := helpers.GetContainer(containerName)
+		Expect(container).ToNot(BeNil(), "Container %s should exist", containerName)
+		Expect(container.State).To(Equal("running"))
+
+		By("Adding a worker node without specifying --control-plane")
+		helpers.AddNode(clusterName, node2, "--role", "worker")
+
+		By("Exposing API and creating Kubernetes client")
+		kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
+		defer helpers.CleanupKubeconfig(kubeconfigPath)
+
+		By("Verifying both nodes are Ready in Kubernetes")
+		helpers.WaitForNodeReady(kubeClient, customNodeName, 5*time.Minute)
+		helpers.WaitForNodeReady(kubeClient, node2, 5*time.Minute)
+		Expect(helpers.GetNodeCount(kubeClient)).To(Equal(2))
+	})
+
 	It("should add control-plane nodes for HA configuration", Serial, func() {
 		By("Creating a single-node cluster")
 		helpers.CreateCluster(clusterName)
