@@ -183,6 +183,9 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 	if err := haproxyMgr.EnsureHAProxy(ctx, 0); err != nil {
 		return fmt.Errorf("creating HAProxy load balancer: %w", err)
 	}
+	if err := haproxyMgr.WaitForHealthy(ctx); err != nil {
+		return fmt.Errorf("waiting for HAProxy: %w", err)
+	}
 	logger.Info("")
 
 	logger.Info("✅ Cluster created successfully!")
