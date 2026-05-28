@@ -94,7 +94,7 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 		labels[k] = v
 	}
 	if !opts.IsControlPlane {
-		labels["node-role.kubernetes.io/worker"] = "worker"
+		labels["node-role.kubernetes.io/worker"] = ""
 	}
 
 	if len(labels) > 0 {
