@@ -108,21 +108,6 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 		return fmt.Errorf("ensuring cluster image: %w", err)
 	}
 
-	// Ensure images volume exists for this node image version
-	logger.Infof("Step 0: Ensuring cluster images volume...")
-	clusterMgr := cluster.New(cluster.Config{
-		Name:                 clusterName,
-		ControlPlane:         controlPlane,
-		HostNetworkPopulator: hostNetworkPopulator,
-		Logger:               logger,
-	})
-
-	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)
-	if err != nil {
-		return fmt.Errorf("ensuring images volume: %w", err)
-	}
-	logger.Info("")
-
 	// Step 1: Create the new node
 	logger.Infof("Step 1: Creating %s node...", role)
 	logger.Infof("Node image: %s", nodeImage)
@@ -139,6 +124,27 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 			usedIPs = append(usedIPs, ip)
 		}
 	}
+
+	// Auto-detect the control-plane node name from container labels
+	discovered, err := findControlPlaneNode(ctx, podmanClient, clusterName, "")
+	if err == nil {
+		controlPlane = discovered
+	}
+
+	// Ensure images volume exists for this node image version
+	logger.Infof("Step 0: Ensuring cluster images volume...")
+	clusterMgr := cluster.New(cluster.Config{
+		Name:                 clusterName,
+		ControlPlane:         controlPlane,
+		HostNetworkPopulator: hostNetworkPopulator,
+		Logger:               logger,
+	})
+
+	clusterImagesVolume, err := clusterMgr.EnsureImagesVolume(ctx, nodeImage)
+	if err != nil {
+		return fmt.Errorf("ensuring images volume: %w", err)
+	}
+	logger.Info("")
 
 	// Discover DNS container IP for cloud-init config
 	dnsMgr, err := dns.NewManager(clusterName)
