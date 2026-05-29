@@ -5,9 +5,12 @@ package haproxy
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -200,6 +203,56 @@ func (m *Manager) createContainer(ctx context.Context, apiPort int) error {
 // GetPublishedPort returns the host port mapped to the HAProxy frontend.
 func (m *Manager) GetPublishedPort(ctx context.Context) (int, error) {
 	return m.podman.GetPublishedPort(ctx, m.containerName(), fmt.Sprintf("%d/tcp", config.HAProxyPort))
+}
+
+// WaitForHealthy polls the Kubernetes API /healthz endpoint through HAProxy
+// until it returns HTTP 200, indicating that HAProxy has healthy backends.
+func (m *Manager) WaitForHealthy(ctx context.Context) error {
+	port, err := m.GetPublishedPort(ctx)
+	if err != nil {
+		return fmt.Errorf("getting HAProxy published port: %w", err)
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	healthURL := fmt.Sprintf("https://localhost:%d/healthz", port)
+	timer := time.NewTimer(2 * time.Minute)
+	defer timer.Stop()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	logrus.Info("Waiting for HAProxy to become healthy...")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return fmt.Errorf("timed out waiting for HAProxy to become healthy on port %d", port)
+		case <-ticker.C:
+			reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, healthURL, nil)
+			if err != nil {
+				cancel()
+				continue
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				cancel()
+				continue
+			}
+			resp.Body.Close()
+			cancel()
+			if resp.StatusCode == http.StatusOK {
+				logrus.Info("HAProxy is healthy")
+				return nil
+			}
+		}
+	}
 }
 
 // discoverBackends finds all control-plane node containers in this cluster

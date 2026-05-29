@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
 
@@ -101,17 +102,24 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 		c.logger.Info("")
 		c.logger.Infof("=== Labeling %s ===", nodeName)
 
-		containerName := fmt.Sprintf("k8s-%s-%s", c.name, controlPlane)
-		kubeClient, err := c.newKubeClient(ctx, cpSSHClient, containerName)
+		haproxyContainer := fmt.Sprintf("%s%s-%s", config.ContainerNamePrefix, c.name, config.HAProxyContainerName)
+		kubeClient, err := c.newKubeClient(ctx, cpSSHClient, haproxyContainer)
 		if err != nil {
-			c.logger.Warnf("Failed to create kubernetes client (non-fatal): %v", err)
-		} else {
-			if err := kubeClient.LabelNode(ctx, nodeName, labels); err != nil {
-				c.logger.Warnf("Failed to label node (non-fatal): %v", err)
-			} else {
-				c.logger.Infof("✅ Node %s labeled", nodeName)
-			}
+			return fmt.Errorf("labeling node %s: creating kubernetes client: %w", nodeName, err)
 		}
+		var labelErr error
+		for attempt := 1; attempt <= 5; attempt++ {
+			labelErr = kubeClient.LabelNode(ctx, nodeName, labels)
+			if labelErr == nil {
+				break
+			}
+			c.logger.Warnf("Failed to label node (attempt %d/5): %v", attempt, labelErr)
+			time.Sleep(5 * time.Second)
+		}
+		if labelErr != nil {
+			return fmt.Errorf("labeling node %s: %w", nodeName, labelErr)
+		}
+		c.logger.Infof("✅ Node %s labeled", nodeName)
 	}
 
 	c.logger.Info("")
