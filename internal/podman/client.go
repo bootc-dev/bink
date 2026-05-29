@@ -405,6 +405,41 @@ func (c *Client) ContainerExecQuiet(ctx context.Context, name string, cmd []stri
 	return nil
 }
 
+func (c *Client) ContainerExecStream(ctx context.Context, name string, cmd []string) (int, error) {
+	if err := c.ensureConnection(); err != nil {
+		return -1, err
+	}
+
+	logrus.Debugf("Executing (stream): %s %s", name, strings.Join(cmd, " "))
+
+	execConfig := &handlers.ExecCreateConfig{}
+	execConfig.Cmd = cmd
+	execConfig.AttachStdout = true
+	execConfig.AttachStderr = true
+
+	sessionID, err := containers.ExecCreate(c.withCtx(ctx), name, execConfig)
+	if err != nil {
+		return -1, fmt.Errorf("creating exec session: %w", err)
+	}
+
+	startOptions := new(containers.ExecStartAndAttachOptions).
+		WithOutputStream(os.Stdout).
+		WithErrorStream(os.Stderr).
+		WithAttachOutput(true).
+		WithAttachError(true)
+
+	if err := containers.ExecStartAndAttach(c.withCtx(ctx), sessionID, startOptions); err != nil {
+		return -1, fmt.Errorf("executing command: %w", err)
+	}
+
+	inspectData, err := containers.ExecInspect(c.withCtx(ctx), sessionID, nil)
+	if err != nil {
+		return -1, fmt.Errorf("inspecting exec session: %w", err)
+	}
+
+	return inspectData.ExitCode, nil
+}
+
 func (c *Client) ContainerExecInteractive(ctx context.Context, name string, cmd []string) error {
 	if err := c.ensureConnection(); err != nil {
 		return err

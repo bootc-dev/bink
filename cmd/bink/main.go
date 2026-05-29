@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -53,6 +54,9 @@ Common workflows:
 
   # SSH into a node
   bink node ssh node1
+
+  # Run a command on a node
+  bink node ssh node1 -- uname -a
 
   # Tear down
   bink cluster stop --remove-data`,
@@ -120,6 +124,10 @@ func initConfig() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
+		var exitErr *cli.ExitCodeError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.Code)
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

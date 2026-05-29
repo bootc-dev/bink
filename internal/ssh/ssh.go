@@ -85,6 +85,17 @@ func (c *Client) ExecWithOutput(ctx context.Context, command string) error {
 	return nil
 }
 
+// ExecStream executes a command via SSH, streaming output to stdout/stderr without TTY.
+// Returns the remote command's exit code.
+func (c *Client) ExecStream(ctx context.Context, command string) (int, error) {
+	sshArgs := c.buildSSHArgs(command)
+	execCmd := append([]string{"ssh"}, sshArgs...)
+
+	c.logger.Debugf("Running in container %s: %s", c.containerName, strings.Join(execCmd, " "))
+
+	return c.podmanClient.ContainerExecStream(ctx, c.containerName, execCmd)
+}
+
 // Interactive starts an interactive SSH session
 func (c *Client) Interactive(ctx context.Context) error {
 	sshArgs := c.buildSSHArgs("")
