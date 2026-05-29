@@ -97,7 +97,7 @@ func (m *Manager) createContainer(ctx context.Context) error {
 			},
 		},
 		Labels: map[string]string{
-			"bink.component": "registry",
+			config.LabelComponent: "registry",
 		},
 	}
 

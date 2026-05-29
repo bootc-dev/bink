@@ -102,8 +102,8 @@ func (m *Manager) createContainer(ctx context.Context) error {
 		Image:   config.DNSImage,
 		Network: m.networkName(),
 		Labels: map[string]string{
-			"bink.cluster-name": m.clusterName,
-			"bink.component":    "dns",
+			config.LabelClusterName: m.clusterName,
+			config.LabelComponent:   "dns",
 		},
 	}
 

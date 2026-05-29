@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
 	. "github.com/onsi/ginkgo/v2"
 )
@@ -38,13 +39,13 @@ func CollectFailureLogs(clusterNames ...string) {
 		if cluster == "" {
 			continue
 		}
-		containers, err := podmanClient.ContainerList(ctx, fmt.Sprintf("label=bink.cluster-name=%s", cluster))
+		containers, err := podmanClient.ContainerList(ctx, config.LabelFilter(config.LabelClusterName, cluster))
 		if err != nil {
 			GinkgoWriter.Printf("Log collection: failed to list containers for cluster %s: %v\n", cluster, err)
 			continue
 		}
 		for _, ctr := range containers {
-			nodeName, _ := podmanClient.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.node-name"}}`)
+			nodeName, _ := podmanClient.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelNodeName))
 			if nodeName == "" {
 				continue
 			}

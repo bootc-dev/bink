@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/containers/podman/v5/pkg/api/handlers"
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
@@ -573,28 +574,28 @@ func (c *Client) ContainerInspect(ctx context.Context, name, format string) (str
 			}
 		}
 		return strings.Join(ports, ","), nil
-	case "{{index .Config.Labels \"bink.cluster-name\"}}":
-		if name, ok := data.Config.Labels["bink.cluster-name"]; ok {
+	case config.LabelInspectFormat(config.LabelClusterName):
+		if name, ok := data.Config.Labels[config.LabelClusterName]; ok {
 			return name, nil
 		}
 		return "", nil
-	case "{{index .Config.Labels \"bink.node-name\"}}":
-		if name, ok := data.Config.Labels["bink.node-name"]; ok {
+	case config.LabelInspectFormat(config.LabelNodeName):
+		if name, ok := data.Config.Labels[config.LabelNodeName]; ok {
 			return name, nil
 		}
 		return "", nil
-	case "{{index .Config.Labels \"bink.cluster-ip\"}}":
-		if ip, ok := data.Config.Labels["bink.cluster-ip"]; ok {
+	case config.LabelInspectFormat(config.LabelClusterIP):
+		if ip, ok := data.Config.Labels[config.LabelClusterIP]; ok {
 			return ip, nil
 		}
 		return "", nil
-	case `{{index .Config.Labels "bink.node-role"}}`:
-		if role, ok := data.Config.Labels["bink.node-role"]; ok {
+	case config.LabelInspectFormat(config.LabelNodeRole):
+		if role, ok := data.Config.Labels[config.LabelNodeRole]; ok {
 			return role, nil
 		}
 		return "", nil
-	case `{{index .Config.Labels "bink.component"}}`:
-		if component, ok := data.Config.Labels["bink.component"]; ok {
+	case config.LabelInspectFormat(config.LabelComponent):
+		if component, ok := data.Config.Labels[config.LabelComponent]; ok {
 			return component, nil
 		}
 		return "", nil

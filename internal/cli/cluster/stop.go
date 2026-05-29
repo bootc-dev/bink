@@ -62,7 +62,7 @@ func runStop(ctx context.Context, logger *logrus.Logger, force, removeData bool)
 	}
 
 	// Use label-based filtering for more robust cluster identification
-	filter := fmt.Sprintf("label=bink.cluster-name=%s", clusterName)
+	filter := config.LabelFilter(config.LabelClusterName, clusterName)
 	containers, err := podmanClient.ContainerList(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("listing containers: %w", err)

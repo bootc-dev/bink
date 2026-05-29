@@ -3,7 +3,11 @@
 
 package config
 
-import "github.com/bootc-dev/bink/internal/version"
+import (
+	"fmt"
+
+	"github.com/bootc-dev/bink/internal/version"
+)
 
 const (
 	DefaultNetworkName = "podman"
@@ -51,6 +55,14 @@ const (
 	DefaultCNIManifest   = "https://raw.githubusercontent.com/projectcalico/calico/" + CalicoVersion + "/manifests/calico.yaml"
 	DefaultKubeconfigDir = "."
 
+	LabelClusterName    = "bink.cluster-name"
+	LabelNodeName       = "bink.node-name"
+	LabelClusterIP      = "bink.cluster-ip"
+	LabelNodeRole       = "bink.node-role"
+	LabelComponent      = "bink.component"
+	LabelKubeadmVersion = "bink.kubeadm-version"
+	LabelNodeImage      = "bink.node-image"
+
 	ContainerNamePrefix = "k8s-"
 
 	DNSContainerName = "dns"
@@ -88,6 +100,14 @@ var (
 	DefaultClusterImage = clusterImageBase + ":" + imageTag()
 	DNSImage            = dnsImageBase + ":" + imageTag()
 )
+
+func LabelFilter(key, value string) string {
+	return fmt.Sprintf("label=%s=%s", key, value)
+}
+
+func LabelInspectFormat(key string) string {
+	return fmt.Sprintf("{{index .Config.Labels %q}}", key)
+}
 
 func imageTag() string {
 	if version.Version == "" || version.Version == "dev" {
