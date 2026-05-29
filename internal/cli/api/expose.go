@@ -123,11 +123,17 @@ func RunExpose(ctx context.Context, logger *logrus.Logger, nodeName, kubeconfigP
 		return fmt.Errorf("writing kubeconfig: %w", err)
 	}
 
+	absPath, err := filepath.Abs(kubeconfigPath)
+	if err != nil {
+		absPath = kubeconfigPath
+	}
+	fmt.Printf("export KUBECONFIG=%s\n", absPath)
+
 	logger.Infof("Kubeconfig generated at %s", kubeconfigPath)
 	logger.Infof("   Server URL: https://localhost:%d", hostPort)
 	logger.Info("")
 	logger.Info("Usage:")
-	logger.Infof("  export KUBECONFIG=%s", kubeconfigPath)
+	logger.Infof("  eval \"$(bink api expose)\"")
 	logger.Info("  kubectl get nodes")
 	logger.Info("")
 

@@ -202,10 +202,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 		}
 	} else {
 		logger.Info("Next steps:")
-		logger.Info("  ./bink api expose")
-		logger.Info("")
-		logger.Info("Then use:")
-		logger.Info("  export KUBECONFIG=./kubeconfig")
+		logger.Infof("  eval \"$(bink api expose)\"")
 		logger.Info("  kubectl get nodes")
 	}
 	logger.Info("")

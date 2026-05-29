@@ -79,8 +79,7 @@ func (c *Client) ExecWithOutput(ctx context.Context, command string) error {
 		return fmt.Errorf("ssh exec failed: %w", err)
 	}
 
-	// Write output to stdout (ContainerExec buffers output, so we write it here)
-	fmt.Fprint(os.Stdout, output)
+	fmt.Fprint(os.Stderr, output)
 
 	return nil
 }
