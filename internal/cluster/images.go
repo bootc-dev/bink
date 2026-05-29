@@ -27,8 +27,6 @@ const (
 	ClusterImagesMountPath       = "/var/lib/cluster-images"
 	populatorContainerNamePrefix = "cluster-images-populator"
 
-	kubeadmVersionLabelKey = "bink.kubeadm-version"
-	nodeImageLabelKey      = "bink.node-image"
 )
 
 // PopulatorContainerName returns the populator container name scoped to a kubeadm version.
@@ -46,7 +44,7 @@ func GetKubeadmVersionFromImage(ctx context.Context, podmanClient PodmanClient, 
 	labels, err := podmanClient.ImageInspectLabels(ctx, nodeImage)
 	switch {
 	case err == nil:
-		if v := labels[kubeadmVersionLabelKey]; v != "" {
+		if v := labels[config.LabelKubeadmVersion]; v != "" {
 			return v, nil
 		}
 	case isImageNotFound(err):
@@ -59,7 +57,7 @@ func GetKubeadmVersionFromImage(ctx context.Context, podmanClient PodmanClient, 
 		return version, nil
 	}
 
-	return "", fmt.Errorf("%w from node image %s: label %q not found and version cannot be inferred from the tag", ErrKubeadmVersionUnknown, nodeImage, kubeadmVersionLabelKey)
+	return "", fmt.Errorf("%w from node image %s: label %q not found and version cannot be inferred from the tag", ErrKubeadmVersionUnknown, nodeImage, config.LabelKubeadmVersion)
 }
 
 func isImageNotFound(err error) bool {
@@ -168,8 +166,8 @@ func (c *Cluster) volumeExists(ctx context.Context, name string) (bool, error) {
 
 func (c *Cluster) createVolume(ctx context.Context, name, nodeImage, kubeadmVersion string) error {
 	labels := map[string]string{
-		nodeImageLabelKey:      nodeImage,
-		kubeadmVersionLabelKey: kubeadmVersion,
+		config.LabelNodeImage:      nodeImage,
+		config.LabelKubeadmVersion: kubeadmVersion,
 	}
 	return c.podmanClient.VolumeCreate(ctx, name, labels)
 }

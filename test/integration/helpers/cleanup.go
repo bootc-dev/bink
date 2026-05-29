@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
 	. "github.com/onsi/gomega"
 )
@@ -44,13 +45,13 @@ func CleanupAllTestClusters() {
 		return
 	}
 
-	containerNames, err := podmanClient.ContainerList(ctx, "label=bink.cluster-name")
+	containerNames, err := podmanClient.ContainerList(ctx, "label="+config.LabelClusterName)
 	if err != nil {
 		return
 	}
 
 	for _, name := range containerNames {
-		labelValue, err := podmanClient.ContainerInspect(ctx, name, "{{index .Config.Labels \"bink.cluster-name\"}}")
+		labelValue, err := podmanClient.ContainerInspect(ctx, name, config.LabelInspectFormat(config.LabelClusterName))
 		if err != nil {
 			continue
 		}

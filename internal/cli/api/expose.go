@@ -145,14 +145,14 @@ func findReachableNode(ctx context.Context, podmanClient *podman.Client, cluster
 	}
 
 	// Discover all control-plane nodes
-	filter := fmt.Sprintf("label=bink.cluster-name=%s", clusterName)
+	filter := config.LabelFilter(config.LabelClusterName, clusterName)
 	containers, err := podmanClient.ContainerList(ctx, filter)
 	if err != nil {
 		return "", fmt.Errorf("listing cluster containers: %w", err)
 	}
 
 	for _, name := range containers {
-		component, _ := podmanClient.ContainerInspect(ctx, name, "{{index .Config.Labels \"bink.component\"}}")
+		component, _ := podmanClient.ContainerInspect(ctx, name, config.LabelInspectFormat(config.LabelComponent))
 		if component != "" {
 			continue
 		}
@@ -193,7 +193,7 @@ func findReachableNode(ctx context.Context, podmanClient *podman.Client, cluster
 		}
 
 		if reachable {
-			node, _ := podmanClient.ContainerInspect(ctx, containerName, "{{index .Config.Labels \"bink.node-name\"}}")
+			node, _ := podmanClient.ContainerInspect(ctx, containerName, config.LabelInspectFormat(config.LabelNodeName))
 			logger.Infof("Using control-plane node %s to fetch kubeconfig", node)
 			return containerName, nil
 		}

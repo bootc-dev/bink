@@ -28,7 +28,7 @@ func CompleteClusterNames(cmd *cobra.Command, args []string, toComplete string) 
 	seen := make(map[string]bool)
 	var names []string
 	for _, ctr := range containers {
-		clusterName, err := client.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.cluster-name"}}`)
+		clusterName, err := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelClusterName))
 		if err != nil || clusterName == "" {
 			continue
 		}
@@ -48,18 +48,18 @@ func CompleteNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]
 
 	ctx := cmd.Context()
 	clusterName := viper.GetString("cluster.name")
-	containers, err := client.ContainerList(ctx, "label=bink.cluster-name="+clusterName)
+	containers, err := client.ContainerList(ctx, config.LabelFilter(config.LabelClusterName, clusterName))
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	var names []string
 	for _, ctr := range containers {
-		component, _ := client.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.component"}}`)
+		component, _ := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelComponent))
 		if component != "" {
 			continue
 		}
-		nodeName, err := client.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.node-name"}}`)
+		nodeName, err := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelNodeName))
 		if err != nil || nodeName == "" {
 			continue
 		}
@@ -78,22 +78,22 @@ func CompleteControlPlaneNodes(cmd *cobra.Command, args []string, toComplete str
 
 	ctx := cmd.Context()
 	clusterName := viper.GetString("cluster.name")
-	containers, err := client.ContainerList(ctx, "label=bink.cluster-name="+clusterName)
+	containers, err := client.ContainerList(ctx, config.LabelFilter(config.LabelClusterName, clusterName))
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	var names []string
 	for _, ctr := range containers {
-		component, _ := client.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.component"}}`)
+		component, _ := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelComponent))
 		if component != "" {
 			continue
 		}
-		role, _ := client.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.node-role"}}`)
+		role, _ := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelNodeRole))
 		if role != "control-plane" {
 			continue
 		}
-		nodeName, err := client.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.node-name"}}`)
+		nodeName, err := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelNodeName))
 		if err != nil || nodeName == "" {
 			continue
 		}

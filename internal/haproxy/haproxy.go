@@ -182,8 +182,8 @@ func (m *Manager) createContainer(ctx context.Context, apiPort int) error {
 			},
 		},
 		Labels: map[string]string{
-			"bink.cluster-name": m.clusterName,
-			"bink.component":    "haproxy",
+			config.LabelClusterName: m.clusterName,
+			config.LabelComponent:   "haproxy",
 		},
 	}
 
@@ -205,7 +205,7 @@ func (m *Manager) GetPublishedPort(ctx context.Context) (int, error) {
 // discoverBackends finds all control-plane node containers in this cluster
 // and returns their bridge IPs as backends.
 func (m *Manager) discoverBackends(ctx context.Context) ([]backend, error) {
-	filter := fmt.Sprintf("label=bink.cluster-name=%s", m.clusterName)
+	filter := config.LabelFilter(config.LabelClusterName, m.clusterName)
 	containers, err := m.podman.ContainerList(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("listing cluster containers: %w", err)
@@ -214,7 +214,7 @@ func (m *Manager) discoverBackends(ctx context.Context) ([]backend, error) {
 	var backends []backend
 	for _, containerName := range containers {
 		// Skip non-node containers (haproxy, etc.)
-		component, _ := m.podman.ContainerInspect(ctx, containerName, "{{index .Config.Labels \"bink.component\"}}")
+		component, _ := m.podman.ContainerInspect(ctx, containerName, config.LabelInspectFormat(config.LabelComponent))
 		if component != "" {
 			continue
 		}
@@ -231,7 +231,7 @@ func (m *Manager) discoverBackends(ctx context.Context) ([]backend, error) {
 			continue
 		}
 
-		nodeName, _ := m.podman.ContainerInspect(ctx, containerName, "{{index .Config.Labels \"bink.node-name\"}}")
+		nodeName, _ := m.podman.ContainerInspect(ctx, containerName, config.LabelInspectFormat(config.LabelNodeName))
 		if nodeName == "" {
 			nodeName = containerName
 		}

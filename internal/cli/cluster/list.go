@@ -67,7 +67,7 @@ func runClusterList(ctx context.Context, logger *logrus.Logger, nameOnly bool) e
 		}
 
 		// Get cluster name from label
-		clusterNameLabel, err := podmanClient.ContainerInspect(ctx, containerName, "{{index .Config.Labels \"bink.cluster-name\"}}")
+		clusterNameLabel, err := podmanClient.ContainerInspect(ctx, containerName, config.LabelInspectFormat(config.LabelClusterName))
 		if err != nil {
 			logger.Warnf("Failed to get cluster name for %s: %v", containerName, err)
 			continue
@@ -79,7 +79,7 @@ func runClusterList(ctx context.Context, logger *logrus.Logger, nameOnly bool) e
 		}
 
 		// Get node name from label
-		nodeName, err := podmanClient.ContainerInspect(ctx, containerName, "{{index .Config.Labels \"bink.node-name\"}}")
+		nodeName, err := podmanClient.ContainerInspect(ctx, containerName, config.LabelInspectFormat(config.LabelNodeName))
 		if err != nil {
 			logger.Warnf("Failed to get node name for %s: %v", containerName, err)
 			continue

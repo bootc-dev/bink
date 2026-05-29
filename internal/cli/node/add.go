@@ -119,13 +119,13 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	logger.Infof("Node image: %s", nodeImage)
 
 	// Collect IPs of existing nodes to avoid collisions
-	existingContainers, err := podmanClient.ContainerList(ctx, "label=bink.cluster-name="+clusterName)
+	existingContainers, err := podmanClient.ContainerList(ctx, config.LabelFilter(config.LabelClusterName, clusterName))
 	if err != nil {
 		return fmt.Errorf("listing existing nodes: %w", err)
 	}
 	var usedIPs []string
 	for _, ctr := range existingContainers {
-		ip, err := podmanClient.ContainerInspect(ctx, ctr, `{{index .Config.Labels "bink.cluster-ip"}}`)
+		ip, err := podmanClient.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelClusterIP))
 		if err == nil && ip != "" {
 			usedIPs = append(usedIPs, ip)
 		}

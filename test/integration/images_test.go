@@ -86,9 +86,9 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		By("Verifying volume has version labels")
 		labels, err := podmanClient.VolumeInspectLabels(ctx, volumeName)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(labels).To(HaveKey("bink.kubeadm-version"))
-		Expect(labels).To(HaveKey("bink.node-image"))
-		Expect(labels["bink.node-image"]).To(Equal(config.DefaultNodeImage))
+		Expect(labels).To(HaveKey(config.LabelKubeadmVersion))
+		Expect(labels).To(HaveKey(config.LabelNodeImage))
+		Expect(labels[config.LabelNodeImage]).To(Equal(config.DefaultNodeImage))
 
 		By("Verifying volume is marked as completed")
 		err = podmanClient.ContainerRunQuiet(ctx,
@@ -129,8 +129,7 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		fakeVolumeName := cluster.ClusterImagesVolumeName(fakeVersion)
 
 		By("Building a fake node image with a different kubeadm version label")
-		containerfile := fmt.Sprintf(`FROM %s
-LABEL bink.kubeadm-version=%s`, config.DefaultNodeImage, fakeVersion)
+		containerfile := fmt.Sprintf("FROM %s\nLABEL %s=%s", config.DefaultNodeImage, config.LabelKubeadmVersion, fakeVersion)
 		cmd := exec.CommandContext(ctx, "podman", "build", "-t", fakeImage, "-f", "-", ".")
 		cmd.Stdin = strings.NewReader(containerfile)
 		output, err := cmd.CombinedOutput()
@@ -167,11 +166,11 @@ LABEL bink.kubeadm-version=%s`, config.DefaultNodeImage, fakeVersion)
 		By("Verifying each volume has the correct labels")
 		labels1, err := podmanClient.VolumeInspectLabels(ctx, vol1)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(labels1["bink.node-image"]).To(Equal(config.DefaultNodeImage))
+		Expect(labels1[config.LabelNodeImage]).To(Equal(config.DefaultNodeImage))
 
 		labels2, err := podmanClient.VolumeInspectLabels(ctx, vol2)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(labels2["bink.kubeadm-version"]).To(Equal(fakeVersion))
-		Expect(labels2["bink.node-image"]).To(Equal(fakeImage))
+		Expect(labels2[config.LabelKubeadmVersion]).To(Equal(fakeVersion))
+		Expect(labels2[config.LabelNodeImage]).To(Equal(fakeImage))
 	})
 })

@@ -62,7 +62,7 @@ func runRemove(ctx context.Context, nodeName string, force bool, logger *logrus.
 	}
 
 	// Check if this is a control-plane node
-	role, err := podmanClient.ContainerInspect(ctx, containerName, `{{index .Config.Labels "bink.node-role"}}`)
+	role, err := podmanClient.ContainerInspect(ctx, containerName, config.LabelInspectFormat(config.LabelNodeRole))
 	if err != nil {
 		return fmt.Errorf("inspecting node role for %s: %w", containerName, err)
 	}
@@ -124,22 +124,22 @@ func runRemove(ctx context.Context, nodeName string, force bool, logger *logrus.
 // findControlPlaneNode finds a control-plane node in the cluster that is not
 // the node being removed.
 func findControlPlaneNode(ctx context.Context, podmanClient *podman.Client, clusterName, excludeNode string) (string, error) {
-	filter := fmt.Sprintf("label=bink.cluster-name=%s", clusterName)
+	filter := config.LabelFilter(config.LabelClusterName, clusterName)
 	containers, err := podmanClient.ContainerList(ctx, filter)
 	if err != nil {
 		return "", fmt.Errorf("listing cluster containers: %w", err)
 	}
 
 	for _, name := range containers {
-		component, _ := podmanClient.ContainerInspect(ctx, name, `{{index .Config.Labels "bink.component"}}`)
+		component, _ := podmanClient.ContainerInspect(ctx, name, config.LabelInspectFormat(config.LabelComponent))
 		if component != "" {
 			continue
 		}
-		nodeName, _ := podmanClient.ContainerInspect(ctx, name, `{{index .Config.Labels "bink.node-name"}}`)
+		nodeName, _ := podmanClient.ContainerInspect(ctx, name, config.LabelInspectFormat(config.LabelNodeName))
 		if nodeName == excludeNode {
 			continue
 		}
-		role, _ := podmanClient.ContainerInspect(ctx, name, `{{index .Config.Labels "bink.node-role"}}`)
+		role, _ := podmanClient.ContainerInspect(ctx, name, config.LabelInspectFormat(config.LabelNodeRole))
 		if role == "control-plane" {
 			return nodeName, nil
 		}
