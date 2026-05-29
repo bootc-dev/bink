@@ -86,6 +86,18 @@ var _ = Describe("Cluster Lifecycle", func() {
 			_, hasCP := n1.Labels["node-role.kubernetes.io/control-plane"]
 			Expect(hasCP).To(BeTrue(), "%s should have control-plane role", customNodeName)
 
+			By("Verifying bink node ssh can run a command on the node")
+			sshCmd := helpers.BinkCmd("node", "ssh", customNodeName, "--cluster-name", clusterName, "--", "uname", "-n")
+			sshSession := helpers.RunCommand(sshCmd)
+			Expect(sshSession.ExitCode()).To(Equal(0))
+			sshOutput := string(sshSession.Out.Contents())
+			Expect(sshOutput).To(ContainSubstring(customNodeName), "SSH command output should contain the node hostname")
+
+			By("Verifying bink node ssh propagates non-zero exit codes")
+			failCmd := helpers.BinkCmd("node", "ssh", customNodeName, "--cluster-name", clusterName, "--", "exit", "42")
+			failSession := helpers.RunCommand(failCmd)
+			Expect(failSession.ExitCode()).To(Equal(42), "SSH command should propagate the remote exit code")
+
 			By("Verifying Calico CNI is running")
 			helpers.WaitForPodReady(kubeClient, "kube-system", "k8s-app=calico-node", 3*time.Minute)
 
