@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bootc-dev/bink/internal/cli"
 	"github.com/bootc-dev/bink/internal/cli/api"
 	"github.com/bootc-dev/bink/internal/cli/cluster"
 	"github.com/bootc-dev/bink/internal/cli/node"
@@ -83,6 +84,8 @@ func init() {
 	viper.BindPFlag("cluster.name", rootCmd.PersistentFlags().Lookup("cluster-name"))
 	viper.BindPFlag("logging.verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("logging.debug", rootCmd.PersistentFlags().Lookup("debug"))
+
+	rootCmd.RegisterFlagCompletionFunc("cluster-name", cli.CompleteClusterNames)
 
 	rootCmd.AddCommand(cluster.NewClusterCmd())
 	rootCmd.AddCommand(node.NewNodeCmd())

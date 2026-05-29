@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/bootc-dev/bink/internal/cli"
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/dns"
 	"github.com/bootc-dev/bink/internal/haproxy"
@@ -25,7 +26,8 @@ func newRemoveCmd() *cobra.Command {
 		Use:   "remove <node-name>",
 		Short: "Remove a node from the cluster",
 		Long:  "Drain and remove a node from the Kubernetes cluster, then stop and remove its container",
-		Args:  cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cli.CompleteNodeNames,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
 			return runRemove(cmd.Context(), args[0], force, logger)

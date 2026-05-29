@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/bootc-dev/bink/internal/cli"
 	"github.com/bootc-dev/bink/internal/node"
 	"github.com/bootc-dev/bink/internal/ssh"
 )
@@ -25,8 +26,9 @@ func newSSHCmd() *cobra.Command {
 
   # SSH into a worker node in a named cluster
   bink node ssh node2 --cluster-name dev`,
-		Args: cobra.ExactArgs(1),
-		RunE: runSSH,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cli.CompleteNodeNames,
+		RunE:              runSSH,
 	}
 
 	return cmd

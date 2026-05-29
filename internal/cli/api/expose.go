@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/bootc-dev/bink/internal/cli"
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/haproxy"
 	"github.com/bootc-dev/bink/internal/podman"
@@ -43,6 +44,8 @@ This command:
 
 	cmd.Flags().StringVarP(&nodeName, "node", "n", "", "Node name to fetch kubeconfig from (auto-detected if not set)")
 	cmd.Flags().StringVarP(&kubeconfigPath, "kubeconfig", "k", filepath.Join(config.DefaultKubeconfigDir, "kubeconfig"), "Path to save kubeconfig")
+
+	cmd.RegisterFlagCompletionFunc("node", cli.CompleteNodeNames)
 
 	return cmd
 }
