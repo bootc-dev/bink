@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/bootc-dev/bink/internal/cli"
 	"github.com/bootc-dev/bink/internal/cli/api"
@@ -115,6 +116,7 @@ func initConfig() {
 	}
 
 	viper.SetEnvPrefix("BINK")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
