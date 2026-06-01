@@ -70,36 +70,4 @@ func CompleteNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	return names, cobra.ShellCompDirectiveNoFileComp
 }
 
-func CompleteControlPlaneNodes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	client, err := podman.NewClient()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 
-	ctx := cmd.Context()
-	clusterName := viper.GetString("cluster.name")
-	containers, err := client.ContainerList(ctx, config.LabelFilter(config.LabelClusterName, clusterName))
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	var names []string
-	for _, ctr := range containers {
-		component, _ := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelComponent))
-		if component != "" {
-			continue
-		}
-		role, _ := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelNodeRole))
-		if role != "control-plane" {
-			continue
-		}
-		nodeName, err := client.ContainerInspect(ctx, ctr, config.LabelInspectFormat(config.LabelNodeName))
-		if err != nil || nodeName == "" {
-			continue
-		}
-		if strings.HasPrefix(nodeName, toComplete) {
-			names = append(names, nodeName)
-		}
-	}
-	return names, cobra.ShellCompDirectiveNoFileComp
-}

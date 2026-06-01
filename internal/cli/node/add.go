@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/bootc-dev/bink/internal/cli"
 	"github.com/bootc-dev/bink/internal/cluster"
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/dns"
@@ -22,7 +21,6 @@ import (
 )
 
 func newAddCmd() *cobra.Command {
-	var controlPlane string
 	var nodeImage string
 	var role string
 	var memory int
@@ -49,11 +47,10 @@ func newAddCmd() *cobra.Command {
 				return err
 			}
 			logger := logrus.New()
-			return runAdd(cmd.Context(), args[0], controlPlane, nodeImage, role, memory, maxMemory, hostNetworkPopulator, labels, logger)
+			return runAdd(cmd.Context(), args[0], nodeImage, role, memory, maxMemory, hostNetworkPopulator, labels, logger)
 		},
 	}
 
-	cmd.Flags().StringVarP(&controlPlane, "control-plane", "c", "node1", "Control plane node name")
 	cmd.Flags().StringVar(&nodeImage, "node-image", config.DefaultNodeImage, "Container image containing base VM images")
 	cmd.Flags().StringVarP(&role, "role", "r", "worker", "Node role: worker or control-plane")
 	cmd.Flags().IntVar(&memory, "memory", 0, "VM memory in MB (0 = use role default: 1900 for control-plane, 768 for worker)")
@@ -64,8 +61,6 @@ func newAddCmd() *cobra.Command {
 	cmd.RegisterFlagCompletionFunc("role", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"worker", "control-plane"}, cobra.ShellCompDirectiveNoFileComp
 	})
-	cmd.RegisterFlagCompletionFunc("control-plane", cli.CompleteControlPlaneNodes)
-
 	return cmd
 }
 
@@ -89,7 +84,7 @@ func parseLabels(labelFlags []string) (map[string]string, error) {
 	return labels, nil
 }
 
-func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, labels map[string]string, logger *logrus.Logger) error {
+func runAdd(ctx context.Context, nodeName, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, labels map[string]string, logger *logrus.Logger) error {
 	// Validate and convert role to boolean
 	var isControlPlane bool
 	switch role {
@@ -132,9 +127,9 @@ func runAdd(ctx context.Context, nodeName, controlPlane, nodeImage, role string,
 	}
 
 	// Auto-detect the control-plane node name from container labels
-	discovered, err := findControlPlaneNode(ctx, podmanClient, clusterName, "")
-	if err == nil {
-		controlPlane = discovered
+	controlPlane, err := findControlPlaneNode(ctx, podmanClient, clusterName, "")
+	if err != nil {
+		return fmt.Errorf("auto-detecting control-plane node: %w", err)
 	}
 
 	// Ensure images volume exists for this node image version
