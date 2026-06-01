@@ -70,7 +70,7 @@ Inside each container, a Fedora bootc VM runs via libvirt/QEMU. The VM boots fro
 The VM runs:
 - **CRI-O** as the container runtime
 - **kubelet** managed by kubeadm
-- **dnsmasq** (node1 only) for cluster DNS
+- **dnsmasq** (in a dedicated container) for cluster DNS
 
 Resources per VM default to 4 vCPUs and 8192 MB RAM, configurable via `--vcpus` and `--memory`.
 
@@ -78,7 +78,7 @@ Resources per VM default to 4 vCPUs and 8192 MB RAM, configurable via `--vcpus` 
 
 A shared container registry (`bink-registry`) runs alongside clusters on the Podman bridge network at a static IP (`10.88.0.2:5000`). It is auto-created on first cluster start and shared across all clusters.
 
-VMs reach the registry through passt networking since passt translates VM traffic through the container's network stack, which sits on the Podman bridge. DNS entry `registry.cluster.local` points to `10.88.0.2` via dnsmasq on node1. CRI-O and containers/registries.conf are configured to trust the registry without TLS.
+VMs reach the registry through passt networking since passt translates VM traffic through the container's network stack, which sits on the Podman bridge. DNS entry `registry.cluster.local` points to `10.88.0.2` via the cluster's dedicated DNS container. CRI-O and containers/registries.conf are configured to trust the registry without TLS.
 
 The registry survives cluster stops and is only removed via `bink registry stop`. Data is persisted in the `bink-registry-data` volume.
 
@@ -128,9 +128,9 @@ Including the cluster name in the hash avoids IP and MAC collisions when multipl
 
 ### DNS
 
-dnsmasq runs on node1 and provides name resolution for the cluster network. All other nodes are configured (via cloud-init) to use node1's cluster IP as their DNS server.
+A dedicated DNS container (`k8s-<cluster>-dns`) runs dnsmasq on the Podman bridge network and provides name resolution for the cluster network. All nodes are configured (via cloud-init) to use this DNS container as their nameserver.
 
-When a new node joins, its hostname and cluster IP are added to `/var/lib/dnsmasq/cluster-hosts` on node1, and dnsmasq is restarted. Entries follow the format: `<cluster-ip> <node-name> <node-name>.cluster.local`.
+When a new node joins, its hostname and cluster IP are added to `/var/lib/dnsmasq/cluster-hosts` in the DNS container, and dnsmasq is reloaded. Entries follow the format: `<cluster-ip> <node-name> <node-name>.cluster.local`.
 
 Upstream DNS servers (`8.8.8.8`, `8.8.4.4`) handle external resolution. The search domain is `cluster.local`.
 
@@ -146,6 +146,8 @@ Host
 Podman bridge (10.88.0.0/16)
   │
   ├── k8s-dev-haproxy ──→ TCP LB across control-plane nodes:6443
+  │
+  ├── k8s-dev-dns ──→ dnsmasq (cluster DNS, 53/udp)
   │
   ├── k8s-dev-node1 ──→ VM NIC1 (passt): internet + port fwd
   │                  ──→ VM NIC2 (mcast): 10.0.0.x/24
@@ -219,7 +221,7 @@ A cluster starts with a single control-plane node (`node1`) and can grow by addi
 ### Adding Nodes
 
 1. Create a new container and VM (same process as node1)
-2. Register the new node's hostname and IP in dnsmasq on node1
+2. Register the new node's hostname and IP in the cluster DNS container
 3. Generate a join token on the control-plane: `kubeadm token create --print-join-command`
 4. For control-plane nodes: upload certificates and join with `--control-plane`, then update HAProxy config
 5. For worker nodes: join and label with `node-role.kubernetes.io/worker=worker`
@@ -274,7 +276,7 @@ The user-data configures:
 - kubelet with volume plugin directory
 - Kernel parameters (IP forwarding, `br_netfilter`)
 - virtiofs mount unit for shared images
-- dnsmasq (node1 only) with initial host entries
+- DNS entries for the cluster DNS container
 - ostree overlay for `/opt` (CNI plugin binaries)
 
 ## Key Paths
@@ -290,6 +292,7 @@ The user-data configures:
 | `/workspace/<node>.qcow2` | Node overlay disk |
 | `/workspace/<node>-cloud-init.iso` | Cloud-init ISO |
 | `/var/lib/libvirt/virtiofsd/virtiofsd.sock` | Virtiofs socket |
+| `/var/lib/dnsmasq/cluster-hosts` | DNS host entries (DNS container only) |
 
 ### Inside VMs
 
@@ -298,5 +301,4 @@ The user-data configures:
 | `/etc/kubernetes/admin.conf` | Kubernetes admin kubeconfig |
 | `~/.kube/config` | User kubeconfig (core user) |
 | `/var/mnt/cluster_images` | Virtiofs mount (shared K8s images) |
-| `/var/lib/dnsmasq/cluster-hosts` | DNS entries (node1 only) |
 | `/opt/cni/bin` | CNI plugin binaries (tmpfs overlay) |

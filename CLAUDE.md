@@ -235,6 +235,7 @@ Host (podman)
 | `/var/run/cluster/cluster.key.pub` | SSH public key |
 | `/images/disk.qcow2` | Base VM disk (from images volume) |
 | `/var/lib/cluster-images/` | Shared filesystem (virtiofs, read-only) |
+| `/var/lib/dnsmasq/cluster-hosts` | DNS host entries (DNS container only) |
 
 ### Key Paths Inside VMs
 
@@ -242,7 +243,6 @@ Host (podman)
 |------|---------|
 | `/etc/kubernetes/admin.conf` | Kubernetes admin kubeconfig |
 | `~/.kube/config` | User kubeconfig (core user) |
-| `/var/lib/dnsmasq/cluster-hosts` | DNS host entries (node1 only) |
 
 ## Running Tests
 
