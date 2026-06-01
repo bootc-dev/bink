@@ -73,7 +73,6 @@ kubectl get nodes
 
 Flags:
 - `--role worker|control-plane` (default: `worker`)
-- `--control-plane node1` (which node to join against, default: `node1`)
 - `--memory` VM RAM in MB
 
 ### SSH into a Node

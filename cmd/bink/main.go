@@ -83,7 +83,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bink/config.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "debug output")
-	rootCmd.PersistentFlags().String("cluster-name", config.DefaultNetworkName, "cluster name")
+	rootCmd.PersistentFlags().StringP("cluster-name", "c", config.DefaultNetworkName, "cluster name")
 
 	viper.BindPFlag("cluster.name", rootCmd.PersistentFlags().Lookup("cluster-name"))
 	viper.BindPFlag("logging.verbose", rootCmd.PersistentFlags().Lookup("verbose"))
