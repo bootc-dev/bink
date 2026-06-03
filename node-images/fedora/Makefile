@@ -6,8 +6,9 @@ DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G
 
 IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
-BOOTC_IMAGE ?= localhost/bink-node:$(IMAGE_TAG)
-NODE_IMAGE ?= localhost/bink-node:$(IMAGE_TAG)-disk
+REGISTRY ?= ghcr.io/alicefr/bink
+BOOTC_IMAGE ?= $(REGISTRY)/bink-node:$(IMAGE_TAG)
+NODE_IMAGE ?= $(REGISTRY)/bink-node:$(IMAGE_TAG)-disk
 
 # Build the OCI bootc image (k8s + cri-o)
 build-bootc-image:
