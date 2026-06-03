@@ -17,8 +17,8 @@ on:
         type: boolean
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/node
+  PUSH_REGISTRY: ghcr.io/alicefr/bink
+  PUSH_IMAGE: node
 
 jobs:
   build:
@@ -38,7 +38,7 @@ jobs:
 
       - name: Log in to GHCR
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
-        run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+        run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
       - name: Build bootc image
         working-directory: node-images/fedora
@@ -58,19 +58,21 @@ jobs:
 
       - name: Tag and push
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
+        working-directory: node-images/fedora
         run: |
+          TAG=${{ steps.meta.outputs.tag }}
+          BOOTC_SRC=$(make -s print-bootc-image)
+          DISK_SRC=$(make -s print-node-image)
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+
           # push bootc image under both :latest and versioned tags
-          podman tag localhost/bink-node:${{ steps.meta.outputs.tag }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
-          podman tag localhost/bink-node:${{ steps.meta.outputs.tag }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
+          podman push ${PUSH_DEST}:${TAG}
+          podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
+          podman push ${PUSH_DEST}:latest
 
           # push disk image under both :latest-disk and versioned tags
-          podman tag localhost/bink-node:${{ steps.meta.outputs.tag }}-disk \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}-disk
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}-disk
-          podman tag localhost/bink-node:${{ steps.meta.outputs.tag }}-disk \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-disk
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-disk
+          podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk
+          podman push ${PUSH_DEST}:${TAG}-disk
+          podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk
+          podman push ${PUSH_DEST}:latest-disk

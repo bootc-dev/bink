@@ -7,8 +7,8 @@ BUILD_MEMORY ?= 4G
 
 IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
 REGISTRY ?= ghcr.io/alicefr/bink
-BOOTC_IMAGE ?= $(REGISTRY)/bink-node:$(IMAGE_TAG)
-NODE_IMAGE ?= $(REGISTRY)/bink-node:$(IMAGE_TAG)-disk
+BOOTC_IMAGE ?= $(REGISTRY)/node:$(IMAGE_TAG)
+NODE_IMAGE ?= $(REGISTRY)/node:$(IMAGE_TAG)-disk
 
 # Build the OCI bootc image (k8s + cri-o)
 build-bootc-image:
@@ -49,6 +49,12 @@ build-disk-image: build-bootc-image
 
 print-image-tag:
 	@echo $(IMAGE_TAG)
+
+print-bootc-image:
+	@echo $(BOOTC_IMAGE)
+
+print-node-image:
+	@echo $(NODE_IMAGE)
 
 clean:
 	@echo "=== Cleaning up ==="
