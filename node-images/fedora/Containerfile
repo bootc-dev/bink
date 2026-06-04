@@ -25,6 +25,7 @@ RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --install dnsmasq \
     --install bubblewrap \
     --install sudo \
+    --install vim-minimal \
     /target-rootfs
 
 FROM scratch AS root
