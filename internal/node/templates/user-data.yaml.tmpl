@@ -85,3 +85,11 @@ runcmd:
   - nmcli connection up "cloud-init enp2s0"
   - systemctl enable --now crio
   - systemctl enable kubelet
+{{- if .TargetImgRef}}
+  - |
+    mount -o remount,rw /sysroot
+    DEPLOY_PATH=$(bootc status --json | jq -r '.status.booted.ostree.deploySerial // empty')
+    CHECKSUM=$(bootc status --json | jq -r '.status.booted.ostree.checksum')
+    ORIGIN="/ostree/deploy/default/deploy/${CHECKSUM}.${DEPLOY_PATH}.origin"
+    sed -i 's|^container-image-reference=.*|container-image-reference=ostree-unverified-registry:{{.TargetImgRef}}|' "$ORIGIN"
+{{- end}}
