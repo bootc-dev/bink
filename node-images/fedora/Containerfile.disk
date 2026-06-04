@@ -25,6 +25,10 @@ RUN podman run --rm ${BOOTC_IMAGE} kubeadm config images list > /output/images.t
 
 FROM scratch
 ARG KUBE_MINOR=1.35
+ARG BOOTC_IMAGE
+ARG BOOTC_DIGEST
 LABEL bink.kubeadm-version=${KUBE_MINOR}
+LABEL bink.bootc-image=${BOOTC_IMAGE}
+LABEL bink.bootc-image-digest=${BOOTC_DIGEST}
 COPY --from=builder /output/disk.qcow2 /disk.qcow2
 COPY --from=builder /output/images.txt /images.txt

@@ -27,6 +27,7 @@ build-bootc-image:
 build-disk-image: build-bootc-image
 	@echo "=== Building node image with qcow2 disk ==="
 	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
+	BOOTC_DIGEST=$$(podman inspect --format '{{.Digest}}' $(BOOTC_IMAGE)) && \
 	podman build \
 		--cap-add=SYS_ADMIN \
 		--cap-add=DAC_READ_SEARCH \
@@ -40,6 +41,7 @@ build-disk-image: build-bootc-image
 		--build-arg DISK_SIZE="$(DISK_SIZE)" \
 		--build-arg MEMORY="$(BUILD_MEMORY)" \
 		--build-arg KUBE_MINOR="$(KUBE_MINOR)" \
+		--build-arg BOOTC_DIGEST="$$BOOTC_DIGEST" \
 		-t $(NODE_IMAGE) \
 		-f Containerfile.disk \
 		.
