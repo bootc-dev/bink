@@ -26,6 +26,7 @@ RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --install bubblewrap \
     --install sudo \
     --install vim-minimal \
+    --install jq \
     /target-rootfs
 
 FROM scratch AS root
