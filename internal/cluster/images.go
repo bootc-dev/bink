@@ -26,7 +26,6 @@ const (
 	ClusterImagesVolumePrefix    = "cluster-images"
 	ClusterImagesMountPath       = "/var/lib/cluster-images"
 	populatorContainerNamePrefix = "cluster-images-populator"
-
 )
 
 // PopulatorContainerName returns the populator container name scoped to a kubeadm version.
@@ -184,6 +183,9 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 		Image:      config.DefaultClusterImage,
 		Entrypoint: []string{"/bin/sh"},
 		Command:    []string{"-c", "sleep infinity"},
+		Labels: map[string]string{
+			config.LabelComponent: "cluster-images-populator",
+		},
 		ImageVolumes: []*specgen.ImageVolume{{
 			Source:      nodeImage,
 			Destination: "/images",
