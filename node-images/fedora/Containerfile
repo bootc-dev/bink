@@ -27,6 +27,7 @@ RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --install sudo \
     --install vim-minimal \
     --install jq \
+    --install less \
     /target-rootfs
 
 FROM scratch AS root
