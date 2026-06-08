@@ -29,6 +29,7 @@ type Node struct {
 	ClusterImagesVolume string
 	APIPort             int // Configured API port (0 = auto-assign)
 	AssignedAPIPort     int // Actual assigned port after container creation
+	TargetImgRef        string
 
 	usedIPs []string
 	podman  *podman.Client
@@ -89,6 +90,13 @@ func WithDNSIP(ip string) NodeOption {
 			return fmt.Errorf("invalid DNS IP address: %q", ip)
 		}
 		n.DNSIP = ip
+		return nil
+	}
+}
+
+func WithTargetImgRef(ref string) NodeOption {
+	return func(n *Node) error {
+		n.TargetImgRef = ref
 		return nil
 	}
 }

@@ -38,8 +38,10 @@ var _ = Describe("Cluster Lifecycle", func() {
 			kubeconfigPath := fmt.Sprintf("../../kubeconfig-%s", clusterName)
 			defer helpers.CleanupKubeconfig(kubeconfigPath)
 
-			By("Creating cluster with --expose, custom node name, and memory ballooning")
-			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-name", customNodeName, "--expose", kubeconfigPath)
+			targetImgRef := "registry.cluster.local:5000/node:latest"
+
+			By("Creating cluster with --expose, custom node name, memory ballooning, and target-imgref")
+			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-name", customNodeName, "--expose", kubeconfigPath, "--target-imgref", targetImgRef)
 			session := helpers.RunCommand(cmd)
 
 			By("Verifying cluster creation command succeeded")
@@ -92,6 +94,10 @@ var _ = Describe("Cluster Lifecycle", func() {
 			Expect(sshSession.ExitCode()).To(Equal(0))
 			sshOutput := string(sshSession.Out.Contents())
 			Expect(sshOutput).To(ContainSubstring(customNodeName), "SSH command output should contain the node hostname")
+
+			By("Verifying bootc status shows the overridden image reference")
+			bootcOutput := helpers.SSHExec(clusterName, customNodeName, "sudo bootc status")
+			Expect(bootcOutput).To(ContainSubstring(targetImgRef), "bootc status should show the target image reference")
 
 			By("Verifying bink node ssh propagates non-zero exit codes")
 			failCmd := helpers.BinkCmd("node", "ssh", customNodeName, "--cluster-name", clusterName, "--", "exit", "42")

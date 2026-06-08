@@ -27,6 +27,7 @@ func newAddCmd() *cobra.Command {
 	var maxMemory int
 	var hostNetworkPopulator bool
 	var labelFlags []string
+	var targetImgRef string
 
 	cmd := &cobra.Command{
 		Use:   "add <node-name>",
@@ -47,7 +48,7 @@ func newAddCmd() *cobra.Command {
 				return err
 			}
 			logger := logrus.New()
-			return runAdd(cmd.Context(), args[0], nodeImage, role, memory, maxMemory, hostNetworkPopulator, labels, logger)
+			return runAdd(cmd.Context(), args[0], nodeImage, role, memory, maxMemory, hostNetworkPopulator, labels, targetImgRef, logger)
 		},
 	}
 
@@ -57,6 +58,7 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = use role default: 4096 for control-plane, 2048 for worker)")
 	cmd.Flags().BoolVar(&hostNetworkPopulator, "host-network-populator", false, "Use host networking for the image populator container (fixes DNS in nested podman)")
 	cmd.Flags().StringArrayVarP(&labelFlags, "label", "l", nil, "Node label in key=value format (can be specified multiple times)")
+	cmd.Flags().StringVar(&targetImgRef, "target-imgref", "", "Override the bootc image reference tracked by the VM (e.g., registry.cluster.local:5000/node:latest)")
 
 	cmd.RegisterFlagCompletionFunc("role", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"worker", "control-plane"}, cobra.ShellCompDirectiveNoFileComp
@@ -84,7 +86,7 @@ func parseLabels(labelFlags []string) (map[string]string, error) {
 	return labels, nil
 }
 
-func runAdd(ctx context.Context, nodeName, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, labels map[string]string, logger *logrus.Logger) error {
+func runAdd(ctx context.Context, nodeName, nodeImage, role string, memory int, maxMemory int, hostNetworkPopulator bool, labels map[string]string, targetImgRef string, logger *logrus.Logger) error {
 	// Validate and convert role to boolean
 	var isControlPlane bool
 	switch role {
@@ -165,6 +167,7 @@ func runAdd(ctx context.Context, nodeName, nodeImage, role string, memory int, m
 		node.WithUsedIPs(usedIPs),
 		node.WithDNSIP(dnsIP),
 		node.WithClusterImagesVolume(clusterImagesVolume),
+		node.WithTargetImgRef(targetImgRef),
 	}
 	if isControlPlane {
 		nodeOpts = append(nodeOpts, node.WithAPIPort(-1))

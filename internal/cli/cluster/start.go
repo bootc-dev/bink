@@ -29,6 +29,7 @@ func newStartCmd() *cobra.Command {
 	var maxMemory int
 	var exposePath string
 	var hostNetworkPopulator bool
+	var targetImgRef string
 
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -44,7 +45,7 @@ func newStartCmd() *cobra.Command {
   bink cluster start --memory 4096 --expose ./kubeconfig`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath, hostNetworkPopulator)
+			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath, hostNetworkPopulator, targetImgRef)
 		},
 	}
 
@@ -55,11 +56,12 @@ func newStartCmd() *cobra.Command {
 	cmd.Flags().IntVar(&maxMemory, "max-memory", 0, "VM max memory in MB for balloon (0 = use role default: 4096 for control-plane, 2048 for worker)")
 	cmd.Flags().StringVar(&exposePath, "expose", "", "Expose API and save kubeconfig to PATH after cluster is up")
 	cmd.Flags().BoolVar(&hostNetworkPopulator, "host-network-populator", false, "Use host networking for the image populator container (fixes DNS in nested podman)")
+	cmd.Flags().StringVar(&targetImgRef, "target-imgref", "", "Override the bootc image reference tracked by the VM (e.g., registry.cluster.local:5000/node:latest)")
 
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string, hostNetworkPopulator bool) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string, hostNetworkPopulator bool, targetImgRef string) error {
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -140,6 +142,7 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 		node.WithMaxMemory(maxMemory),
 		node.WithDNSIP(dnsIP),
 		node.WithClusterImagesVolume(clusterImagesVolume),
+		node.WithTargetImgRef(targetImgRef),
 	)
 	if err != nil {
 		return fmt.Errorf("creating node: %w", err)
