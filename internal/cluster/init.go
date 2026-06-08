@@ -8,6 +8,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 	"text/template"
 	"time"
 
@@ -25,13 +26,15 @@ var calicoManifest []byte
 var kubeadmConfigTemplate = template.Must(template.New("kubeadm-config").Parse(kubeadmConfigTmpl))
 
 type kubeadmConfigParams struct {
-	AdvertiseAddress string
+	AdvertiseAddress  string
+	KubernetesVersion string
 }
 
 // InitOptions holds options for cluster initialization
 type InitOptions struct {
-	NodeName string
-	Timeout  time.Duration
+	NodeName          string
+	KubernetesVersion string
+	Timeout           time.Duration
 }
 
 // Init initializes a Kubernetes cluster on the control plane node
@@ -60,6 +63,15 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 	// Create SSH client
 	sshClient := ssh.NewClientForNode(c.name, nodeName, c.logger)
 
+	// Query the exact kubeadm version from the VM so the config pins it
+	// and prevents kubeadm from doing a remote version lookup.
+	kubeVersion := opts.KubernetesVersion
+	if kubeVersion == "" {
+		if out, err := sshClient.Exec(ctx, "kubeadm version -o short"); err == nil {
+			kubeVersion = strings.TrimSpace(out)
+		}
+	}
+
 	// Create kubeadm config in container
 	c.logger.Info("Creating kubeadm config file...")
 	clusterLabel := c.name
@@ -67,7 +79,7 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 		clusterLabel = config.DefaultNetworkName
 	}
 	containerName := fmt.Sprintf("k8s-%s-%s", clusterLabel, nodeName)
-	if err := c.createKubeadmConfig(ctx, containerName, clusterIP); err != nil {
+	if err := c.createKubeadmConfig(ctx, containerName, clusterIP, kubeVersion); err != nil {
 		return fmt.Errorf("failed to create kubeadm config: %w", err)
 	}
 
@@ -188,10 +200,11 @@ func (c *Cluster) waitForCalicoCNI(ctx context.Context, sshClient *ssh.Client) e
 }
 
 // createKubeadmConfig creates the kubeadm config file in the container
-func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string, advertiseAddress string) error {
+func (c *Cluster) createKubeadmConfig(ctx context.Context, containerName string, advertiseAddress string, kubernetesVersion string) error {
 	var buf bytes.Buffer
 	if err := kubeadmConfigTemplate.Execute(&buf, kubeadmConfigParams{
-		AdvertiseAddress: advertiseAddress,
+		AdvertiseAddress:  advertiseAddress,
+		KubernetesVersion: kubernetesVersion,
 	}); err != nil {
 		return fmt.Errorf("failed to render kubeadm config: %w", err)
 	}

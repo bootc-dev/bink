@@ -146,7 +146,22 @@ func (c *Cluster) generateJoinCommand(ctx context.Context, cpSSHClient *ssh.Clie
 			return "", fmt.Errorf("certificate key is empty")
 		}
 
-		if _, err := cpSSHClient.Exec(ctx, fmt.Sprintf("sudo kubeadm init phase upload-certs --upload-certs --certificate-key %s", certificateKey)); err != nil {
+		// Write a temp config that includes certificateKey and
+		// kubernetesVersion, then pass --config to upload-certs.
+		// --config and --certificate-key are mutually exclusive, so the
+		// key must be in the config file. Setting kubernetesVersion
+		// prevents kubeadm from fetching it from dl.k8s.io — that
+		// remote call eats into the 10s internal timeout and causes
+		// "rate: Wait(n=1) would exceed context deadline".
+		writeCmd := fmt.Sprintf(
+			`sudo cp /etc/kubernetes/kubeadm-config.yaml /tmp/upload-certs-config.yaml && `+
+				`sudo sed -i '/^kind: InitConfiguration/a certificateKey: %s' /tmp/upload-certs-config.yaml`,
+			certificateKey)
+		if _, err := cpSSHClient.Exec(ctx, writeCmd); err != nil {
+			return "", fmt.Errorf("failed to write upload-certs config: %w", err)
+		}
+
+		if _, err := cpSSHClient.Exec(ctx, "sudo kubeadm init phase upload-certs --upload-certs --config /tmp/upload-certs-config.yaml"); err != nil {
 			return "", fmt.Errorf("failed to upload certificates: %w", err)
 		}
 
