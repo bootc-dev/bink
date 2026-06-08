@@ -135,19 +135,20 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 // generateJoinCommand generates a fresh join command from the control plane
 func (c *Cluster) generateJoinCommand(ctx context.Context, cpSSHClient *ssh.Client, isControlPlane bool) (string, error) {
 	if isControlPlane {
-		// For control-plane nodes, we need to upload certificates and get the certificate key
+		// Generate a certificate key, then upload certs encrypted with that key
 		c.logger.Info("Uploading certificates for control-plane join...")
-		certKeyOutput, err := cpSSHClient.Exec(ctx, "sudo kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1")
+		certKeyOutput, err := cpSSHClient.Exec(ctx, "sudo kubeadm certs certificate-key")
 		if err != nil {
-			return "", fmt.Errorf("failed to upload certificates: %w", err)
+			return "", fmt.Errorf("failed to generate certificate key: %w", err)
 		}
-
 		certificateKey := strings.TrimSpace(certKeyOutput)
 		if certificateKey == "" {
 			return "", fmt.Errorf("certificate key is empty")
 		}
 
-		c.logger.Infof("Certificate key: %s", certificateKey)
+		if _, err := cpSSHClient.Exec(ctx, fmt.Sprintf("sudo kubeadm init phase upload-certs --upload-certs --certificate-key %s", certificateKey)); err != nil {
+			return "", fmt.Errorf("failed to upload certificates: %w", err)
+		}
 
 		// Generate join command with control-plane flag
 		output, err := cpSSHClient.Exec(ctx, "sudo kubeadm token create --print-join-command")
