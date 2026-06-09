@@ -20,6 +20,8 @@ import (
 	"github.com/bootc-dev/bink/test/integration/helpers"
 )
 
+const verifyContainerName = "test-images-verify"
+
 var _ = Describe("Cluster Images Volume", Serial, func() {
 	var (
 		podmanClient *podman.Client
@@ -34,9 +36,18 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		podmanClient, err = podman.NewClient()
 		Expect(err).ToNot(HaveOccurred())
 
-		containers, err := podmanClient.ContainerList(ctx, "")
+		// Clean up populator containers from previous test runs.
+		populators, err := podmanClient.ContainerList(ctx, config.LabelFilter(config.LabelComponent, "cluster-images-populator"))
 		Expect(err).ToNot(HaveOccurred())
-		for _, name := range containers {
+		for _, name := range populators {
+			_ = podmanClient.ContainerStop(ctx, name)
+			_ = podmanClient.ContainerRemove(ctx, name, true)
+		}
+
+		// Clean up verify containers from previous test runs.
+		verifiers, err := podmanClient.ContainerList(ctx, config.LabelFilter(config.LabelComponent, "cluster-images-test-verify"))
+		Expect(err).ToNot(HaveOccurred())
+		for _, name := range verifiers {
 			_ = podmanClient.ContainerStop(ctx, name)
 			_ = podmanClient.ContainerRemove(ctx, name, true)
 		}
@@ -60,7 +71,11 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 	AfterEach(func() {
 		ctx := context.Background()
 
-		_ = podmanClient.ContainerRemove(ctx, "test-images-verify", true)
+		verifiers, err := podmanClient.ContainerList(ctx, config.LabelFilter(config.LabelComponent, "cluster-images-test-verify"))
+		Expect(err).ToNot(HaveOccurred())
+		for _, name := range verifiers {
+			_ = podmanClient.ContainerRemove(ctx, name, true)
+		}
 	})
 
 	It("should populate a versioned cluster-images volume with Kubernetes and Calico images", func() {
@@ -99,11 +114,13 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		Expect(err).ToNot(HaveOccurred(), ".completed marker should exist in the volume")
 
 		By("Verifying Calico images are stored in the volume")
-		verifyContainer := "test-images-verify"
 		_, err = podmanClient.ContainerCreate(ctx, &podman.ContainerCreateOptions{
-			Name:    verifyContainer,
+			Name:    verifyContainerName,
 			Image:   config.DefaultClusterImage,
 			Command: []string{"sleep", "infinity"},
+			Labels: map[string]string{
+				config.LabelComponent: "cluster-images-test-verify",
+			},
 			Volumes: []*specgen.NamedVolume{{
 				Name: volumeName,
 				Dest: "/var/lib/containers/storage",
@@ -111,11 +128,11 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 		})
 		Expect(err).ToNot(HaveOccurred())
 
-		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
+		err = podmanClient.ContainerExecQuiet(ctx, verifyContainerName,
 			[]string{"podman", "image", "exists", config.CalicoImageBase + "/node:" + config.CalicoVersion})
 		Expect(err).ToNot(HaveOccurred(), "calico/node image should exist in the volume")
 
-		err = podmanClient.ContainerExecQuiet(ctx, verifyContainer,
+		err = podmanClient.ContainerExecQuiet(ctx, verifyContainerName,
 			[]string{"podman", "image", "exists", config.CalicoImageBase + "/cni:" + config.CalicoVersion})
 		Expect(err).ToNot(HaveOccurred(), "calico/cni image should exist in the volume")
 	})
