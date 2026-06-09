@@ -29,11 +29,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up KVM
-        run: |
-          sudo chmod 666 /dev/kvm
-          ls -la /dev/kvm
-
       - name: Configure kernel for nested containers
         run: |
           # Unload all AppArmor profiles from the kernel.
@@ -65,19 +60,13 @@ jobs:
             libgpgme-dev \
             libbtrfs-dev \
             libdevmapper-dev \
-            pkg-config \
-            systemd=255.4-1ubuntu8.15 \
-            systemd-dev=255.4-1ubuntu8.15 \
-            systemd-resolved=255.4-1ubuntu8.15 \
-            systemd-sysv=255.4-1ubuntu8.15 \
-            systemd-coredump=255.4-1ubuntu8.15 \
-            libsystemd0=255.4-1ubuntu8.15 \
-            libsystemd-shared=255.4-1ubuntu8.15 \
-            libudev1=255.4-1ubuntu8.15 \
-            libudev-dev=255.4-1ubuntu8.15 \
-            libnss-systemd=255.4-1ubuntu8.15 \
-            libpam-systemd=255.4-1ubuntu8.15 \
-            udev=255.4-1ubuntu8.15
+            pkg-config
+
+      - name: Set up KVM
+        run: |
+          # Re-apply after apt-get which may upgrade udev and reset device permissions
+          sudo chmod 666 /dev/kvm
+          ls -la /dev/kvm
 
       - name: Configure Podman
         run: |
