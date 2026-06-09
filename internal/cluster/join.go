@@ -152,7 +152,7 @@ func (c *Cluster) generateJoinCommand(ctx context.Context, cpSSHClient *ssh.Clie
 		// The command prints log lines to stderr and the 64-char hex key on stdout.
 		// We avoid piping (which masks the exit code) and extract the key ourselves.
 		c.logger.Info("Uploading certificates for control-plane join...")
-		certKeyOutput, err := cpSSHClient.Exec(ctx, "sudo kubeadm init phase upload-certs --upload-certs")
+		certKeyOutput, err := cpSSHClient.Exec(ctx, "sudo kubeadm init phase upload-certs --upload-certs --config /etc/kubernetes/kubeadm-config.yaml")
 		if err != nil {
 			return "", fmt.Errorf("failed to upload certificates: %w", err)
 		}
