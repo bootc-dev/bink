@@ -132,19 +132,40 @@ func (c *Cluster) Join(ctx context.Context, opts JoinOptions) error {
 	return nil
 }
 
+func isHex(s string) bool {
+	for _, c := range s {
+		switch {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'f':
+		case c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // generateJoinCommand generates a fresh join command from the control plane
 func (c *Cluster) generateJoinCommand(ctx context.Context, cpSSHClient *ssh.Client, isControlPlane bool) (string, error) {
 	if isControlPlane {
-		// For control-plane nodes, we need to upload certificates and get the certificate key
+		// For control-plane nodes, we need to upload certificates and get the certificate key.
+		// The command prints log lines to stderr and the 64-char hex key on stdout.
+		// We avoid piping (which masks the exit code) and extract the key ourselves.
 		c.logger.Info("Uploading certificates for control-plane join...")
-		certKeyOutput, err := cpSSHClient.Exec(ctx, "sudo kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1")
+		certKeyOutput, err := cpSSHClient.Exec(ctx, "sudo kubeadm init phase upload-certs --upload-certs --config /etc/kubernetes/kubeadm-config.yaml")
 		if err != nil {
 			return "", fmt.Errorf("failed to upload certificates: %w", err)
 		}
 
-		certificateKey := strings.TrimSpace(certKeyOutput)
+		var certificateKey string
+		for _, line := range strings.Split(certKeyOutput, "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) == 64 && isHex(line) {
+				certificateKey = line
+			}
+		}
 		if certificateKey == "" {
-			return "", fmt.Errorf("certificate key is empty")
+			return "", fmt.Errorf("certificate key not found in upload-certs output: %s", certKeyOutput)
 		}
 
 		c.logger.Infof("Certificate key: %s", certificateKey)
