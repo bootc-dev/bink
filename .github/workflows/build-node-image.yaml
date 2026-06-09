@@ -44,10 +44,6 @@ jobs:
         working-directory: node-images/fedora
         run: make build-bootc-image
 
-      - name: Build disk image
-        working-directory: node-images/fedora
-        run: make build-disk-image
-
       - name: Determine image tag
         id: meta
         working-directory: node-images/fedora
@@ -56,22 +52,42 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Image tag: ${TAG}"
 
-      - name: Tag and push
+      - name: Push bootc image
+        id: push-bootc
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
           BOOTC_SRC=$(make -s print-bootc-image)
-          DISK_SRC=$(make -s print-node-image)
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
-          # push bootc image under both :latest and versioned tags
           podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
-          podman push ${PUSH_DEST}:${TAG}
+          podman push --digestfile=/tmp/bootc-digest ${PUSH_DEST}:${TAG}
           podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
           podman push ${PUSH_DEST}:latest
 
-          # push disk image under both :latest-disk and versioned tags
+          BOOTC_DIGEST=$(cat /tmp/bootc-digest)
+          echo "digest=${BOOTC_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Bootc image pushed with digest: ${BOOTC_DIGEST}"
+
+      - name: Build disk image
+        working-directory: node-images/fedora
+        run: |
+          BOOTC_DIGEST="${{ steps.push-bootc.outputs.digest }}"
+          if [ -n "${BOOTC_DIGEST}" ]; then
+            make build-disk-image BOOTC_DIGEST="${BOOTC_DIGEST}"
+          else
+            make build-disk-image
+          fi
+
+      - name: Push disk image
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
+        working-directory: node-images/fedora
+        run: |
+          TAG=${{ steps.meta.outputs.tag }}
+          DISK_SRC=$(make -s print-node-image)
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+
           podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk
           podman push ${PUSH_DEST}:${TAG}-disk
           podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk
