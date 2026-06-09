@@ -67,9 +67,16 @@ jobs:
             libdevmapper-dev \
             pkg-config \
             systemd=255.4-1ubuntu8.15 \
+            systemd-dev=255.4-1ubuntu8.15 \
+            systemd-resolved=255.4-1ubuntu8.15 \
+            systemd-sysv=255.4-1ubuntu8.15 \
+            systemd-coredump=255.4-1ubuntu8.15 \
             libsystemd0=255.4-1ubuntu8.15 \
             libsystemd-shared=255.4-1ubuntu8.15 \
             libudev1=255.4-1ubuntu8.15 \
+            libudev-dev=255.4-1ubuntu8.15 \
+            libnss-systemd=255.4-1ubuntu8.15 \
+            libpam-systemd=255.4-1ubuntu8.15 \
             udev=255.4-1ubuntu8.15
 
       - name: Configure Podman
