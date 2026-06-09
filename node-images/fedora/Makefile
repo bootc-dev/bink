@@ -9,6 +9,7 @@ IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
 REGISTRY ?= ghcr.io/alicefr/bink
 BOOTC_IMAGE ?= $(REGISTRY)/node:$(IMAGE_TAG)
 NODE_IMAGE ?= $(REGISTRY)/node:$(IMAGE_TAG)-disk
+BOOTC_DIGEST ?=
 
 # Build the OCI bootc image (k8s + cri-o)
 build-bootc-image:
@@ -27,7 +28,11 @@ build-bootc-image:
 build-disk-image: build-bootc-image
 	@echo "=== Building node image with qcow2 disk ==="
 	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
-	BOOTC_DIGEST=$$(podman inspect --format '{{.Digest}}' $(BOOTC_IMAGE)) && \
+	if [ -z "$(BOOTC_DIGEST)" ]; then \
+		BOOTC_DIGEST=$$(podman inspect --format '{{.Digest}}' $(BOOTC_IMAGE)); \
+	else \
+		BOOTC_DIGEST="$(BOOTC_DIGEST)"; \
+	fi && \
 	podman build \
 		--cap-add=SYS_ADMIN \
 		--cap-add=DAC_READ_SEARCH \
