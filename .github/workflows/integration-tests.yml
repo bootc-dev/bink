@@ -65,7 +65,12 @@ jobs:
             libgpgme-dev \
             libbtrfs-dev \
             libdevmapper-dev \
-            pkg-config
+            pkg-config \
+            systemd=255.4-1ubuntu8.15 \
+            libsystemd0=255.4-1ubuntu8.15 \
+            libsystemd-shared=255.4-1ubuntu8.15 \
+            libudev1=255.4-1ubuntu8.15 \
+            udev=255.4-1ubuntu8.15
 
       - name: Configure Podman
         run: |
