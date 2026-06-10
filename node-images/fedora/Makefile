@@ -25,7 +25,7 @@ build-bootc-image:
 	@echo "✅ Bootc image built: $(BOOTC_IMAGE)"
 
 # Build the disk image (qcow2 in a scratch container, for use as a podman image volume)
-build-disk-image: build-bootc-image
+build-disk-image:
 	@echo "=== Building node image with qcow2 disk ==="
 	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
 	if [ -z "$(BOOTC_DIGEST)" ]; then \

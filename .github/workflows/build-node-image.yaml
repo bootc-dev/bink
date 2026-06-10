@@ -69,13 +69,18 @@ jobs:
           BOOTC_DIGEST=$(cat /tmp/bootc-digest)
           echo "digest=${BOOTC_DIGEST}" >> "$GITHUB_OUTPUT"
           echo "Bootc image pushed with digest: ${BOOTC_DIGEST}"
+          echo "Clean up local images"
+          podman rmi -f ${BOOTC_SRC} ${PUSH_DEST}:${TAG} ${PUSH_DEST}:latest
+          echo "push_dest=${PUSH_DEST}:${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Build disk image
         working-directory: node-images/fedora
         run: |
           BOOTC_DIGEST="${{ steps.push-bootc.outputs.digest }}"
-          if [ -n "${BOOTC_DIGEST}" ]; then
-            make build-disk-image BOOTC_DIGEST="${BOOTC_DIGEST}"
+          PUSH_DEST="${{ steps.push-bootc.outputs.push_dest }}"
+          if [ -n "${BOOTC_DIGEST}" ] && [ -n "${PUSH_DEST}" ]; then
+            podman pull "${PUSH_DEST}"
+            make build-disk-image BOOTC_IMAGE="${PUSH_DEST}" BOOTC_DIGEST="${BOOTC_DIGEST}"
           else
             make build-disk-image
           fi
