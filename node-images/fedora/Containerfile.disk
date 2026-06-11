@@ -9,6 +9,7 @@ ARG STORAGE_PATH
 ARG BOOTC_IMAGE
 ARG DISK_SIZE=10G
 ARG MEMORY=4G
+ARG BCVK_EXTRA_ARGS=""
 ENV CONTAINERS_STORAGE_CONF=/tmp/storage.conf
 RUN mkdir -p /output && \
     printf "[storage]\ndriver = \"overlay\"\ngraphroot = \"${STORAGE_PATH}\"\n" > $CONTAINERS_STORAGE_CONF && \
@@ -19,6 +20,7 @@ RUN mkdir -p /output && \
     --format qcow2 \
     --memory ${MEMORY} \
     --disk-size ${DISK_SIZE} \
+    ${BCVK_EXTRA_ARGS} \
     ${BOOTC_IMAGE} \
     /output/disk.qcow2
 RUN podman run --rm ${BOOTC_IMAGE} kubeadm config images list > /output/images.txt

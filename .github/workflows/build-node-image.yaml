@@ -97,3 +97,27 @@ jobs:
           podman push ${PUSH_DEST}:${TAG}-disk
           podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk
           podman push ${PUSH_DEST}:latest-disk
+
+      - name: Build composefs disk image
+        working-directory: node-images/fedora
+        run: |
+          BOOTC_DIGEST="${{ steps.push-bootc.outputs.digest }}"
+          PUSH_DEST="${{ steps.push-bootc.outputs.push_dest }}"
+          if [ -n "${BOOTC_DIGEST}" ] && [ -n "${PUSH_DEST}" ]; then
+            make build-disk-image-composefs BOOTC_IMAGE="${PUSH_DEST}" BOOTC_DIGEST="${BOOTC_DIGEST}"
+          else
+            make build-disk-image-composefs
+          fi
+
+      - name: Push composefs disk image
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
+        working-directory: node-images/fedora
+        run: |
+          TAG=${{ steps.meta.outputs.tag }}
+          DISK_SRC=$(make -s print-node-image-composefs)
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+
+          podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk-composefs
+          podman push ${PUSH_DEST}:${TAG}-disk-composefs
+          podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk-composefs
+          podman push ${PUSH_DEST}:latest-disk-composefs
