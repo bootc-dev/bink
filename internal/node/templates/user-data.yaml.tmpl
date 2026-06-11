@@ -32,7 +32,6 @@ write_files:
     content: |
       [crio.network]
       plugin_dirs = [
-        "/opt/cni/bin",
         "/var/lib/cni/bin",
         "/usr/libexec/cni",
       ]
@@ -75,11 +74,12 @@ runcmd:
   - sysctl -w net.ipv4.ip_forward=1
   - echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-kubernetes.conf
   - mkdir -p /var/lib/kubelet/volumeplugins
+  - mkdir -p /var/lib/cni/bin
   - mkdir -p /var/mnt/cluster_images
   - mkdir -p /var/lib/containers/storage
   - systemctl daemon-reload
   - systemctl enable --now var-mnt-cluster_images.mount
-  - systemctl enable --now ostree-state-overlay@opt.service
+  - systemctl enable --now ostree-state-overlay@opt.service || true
   - systemctl enable --now qemu-guest-agent
   - nmcli connection modify "cloud-init enp2s0" ipv4.dns-search "~{{.ClusterDomain}} {{.ClusterDomain}}" ipv4.ignore-auto-dns yes
   - nmcli connection up "cloud-init enp2s0"

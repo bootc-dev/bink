@@ -34,7 +34,8 @@ FROM scratch AS root
 COPY --from=builder /target-rootfs/ /
 
 RUN passwd -d root
-RUN sed -i 's|"/opt/cni/bin"|"/var/lib/cni/bin"|g' /etc/crio/crio.conf
+RUN sed -i 's|"/opt/cni/bin"|"/var/lib/cni/bin"|g' /etc/crio/crio.conf && \
+    sed -i 's|"/opt/cni/net.d"|"/etc/cni/net.d"|g' /etc/crio/crio.conf
 RUN bootc container lint
 
 LABEL containers.bootc 1
