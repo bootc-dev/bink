@@ -119,7 +119,7 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 		return fmt.Errorf("failed to install Calico: %w", err)
 	}
 
-	c.logger.Info("CNI plugins will be installed to /opt/cni/bin (tmpfs overlay for bootc)")
+	c.logger.Info("CNI plugins will be installed to /var/lib/cni/bin")
 
 	// Wait for Calico to write its CNI config before installing CoreDNS
 	c.logger.Info("Waiting for Calico CNI configuration...")
