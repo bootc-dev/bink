@@ -21,6 +21,10 @@ LDFLAGS := -X $(VERSION_PKG).Version=$(VERSION) \
            -X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) \
            -X $(VERSION_PKG).BuildDate=$(BUILD_DATE)
 
+# Build tags (auto-detect optional C dependencies)
+BUILDTAGS ?= \
+	$(shell hack/btrfs_installed_tag.sh)
+
 # Directories
 VM_DIR := containerfiles/cluster-image
 
@@ -29,7 +33,7 @@ all: build-bink
 # Build the bink CLI binary
 build-bink:
 	@echo "=== Building bink CLI binary ==="
-	go build -ldflags "$(LDFLAGS)" -o $(BINK_BINARY) ./cmd/bink
+	go build -tags "$(BUILDTAGS)" -ldflags "$(LDFLAGS)" -o $(BINK_BINARY) ./cmd/bink
 	@echo "✅ bink binary built: $(BINK_BINARY)"
 
 
