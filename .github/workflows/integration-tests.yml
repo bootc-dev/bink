@@ -12,9 +12,9 @@ concurrency:
 
 env:
   BINK_IMAGES: >-
-    ghcr.io/alicefr/bink/cluster:latest
-    ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk
-    ghcr.io/alicefr/bink/dns:latest
+    ghcr.io/bootc-dev/bink/cluster:latest
+    ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk
+    ghcr.io/bootc-dev/bink/dns:latest
   EXTERNAL_IMAGES: >-
     docker.io/library/registry:2
     docker.io/library/haproxy:lts-alpine

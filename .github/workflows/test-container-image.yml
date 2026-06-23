@@ -17,9 +17,9 @@ concurrency:
 
 env:
   BINK_RUNTIME_IMAGES: >-
-    ghcr.io/alicefr/bink/cluster:latest
-    ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk
-    ghcr.io/alicefr/bink/dns:latest
+    ghcr.io/bootc-dev/bink/cluster:latest
+    ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk
+    ghcr.io/bootc-dev/bink/dns:latest
 
 jobs:
   test-container-image:

@@ -18,8 +18,8 @@ func TestExtractVersionFromTag(t *testing.T) {
 		imageRef string
 		expected string
 	}{
-		{"standard tag", "ghcr.io/alicefr/bink/node:v1.35-fedora-43-disk", "1.35"},
-		{"no v prefix", "ghcr.io/alicefr/bink/node:1.35-fedora-43", "1.35"},
+		{"standard tag", "ghcr.io/bootc-dev/bink/node:v1.35-fedora-43-disk", "1.35"},
+		{"no v prefix", "ghcr.io/bootc-dev/bink/node:1.35-fedora-43", "1.35"},
 		{"version only", "registry/repo:v1.30", "1.30"},
 		{"latest tag", "registry/repo:latest", ""},
 		{"no tag", "registry/repo", ""},
@@ -122,7 +122,7 @@ func TestGetKubeadmVersionFromImage(t *testing.T) {
 		mock := &mockPodmanClient{
 			imageLabels: map[string]string{"bink.kubeadm-version": "1.35"},
 		}
-		v, err := GetKubeadmVersionFromImage(ctx, mock, "ghcr.io/alicefr/bink/node:v1.35-fedora-43")
+		v, err := GetKubeadmVersionFromImage(ctx, mock, "ghcr.io/bootc-dev/bink/node:v1.35-fedora-43")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -135,7 +135,7 @@ func TestGetKubeadmVersionFromImage(t *testing.T) {
 		mock := &mockPodmanClient{
 			imageInspectErr: fmt.Errorf("image not known"),
 		}
-		v, err := GetKubeadmVersionFromImage(ctx, mock, "ghcr.io/alicefr/bink/node:v1.30-fedora-43")
+		v, err := GetKubeadmVersionFromImage(ctx, mock, "ghcr.io/bootc-dev/bink/node:v1.30-fedora-43")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -199,7 +199,7 @@ func TestGetKubeadmVersionFromImage(t *testing.T) {
 
 func TestEnsureImagesVolume(t *testing.T) {
 	ctx := context.Background()
-	nodeImage := "ghcr.io/alicefr/bink/node:v1.35-fedora-43"
+	nodeImage := "ghcr.io/bootc-dev/bink/node:v1.35-fedora-43"
 
 	t.Run("volume exists and completed", func(t *testing.T) {
 		mock := &mockPodmanClient{
