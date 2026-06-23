@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-BINK_IMAGE="${BINK_IMAGE:-ghcr.io/alicefr/bink/bink:latest}"
+BINK_IMAGE="${BINK_IMAGE:-ghcr.io/bootc-dev/bink/bink:latest}"
 IMAGE_CACHE_DIR="${IMAGE_CACHE_DIR:-}"
 if [ -n "${CONTAINER_HOST:-}" ]; then
     PODMAN_SOCK="${CONTAINER_HOST#unix://}"

@@ -34,7 +34,7 @@ podman run --rm -ti --network=host --security-opt label=disable \
   -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
   -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v $(pwd):/output \
-  ghcr.io/alicefr/bink/bink:latest \
+  ghcr.io/bootc-dev/bink/bink:latest \
   cluster start
 
 # Expose the API (kubeconfig is written to the mounted directory)
@@ -42,7 +42,7 @@ podman run --rm -ti --network=host --security-opt label=disable \
   -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
   -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v $(pwd):/output \
-  ghcr.io/alicefr/bink/bink:latest \
+  ghcr.io/bootc-dev/bink/bink:latest \
   api expose
 ```
 
@@ -52,7 +52,7 @@ alias bink='podman run --rm -ti --network=host --security-opt label=disable \
   -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock \
   -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v $(pwd):/output \
-  ghcr.io/alicefr/bink/bink:latest'
+  ghcr.io/bootc-dev/bink/bink:latest'
 ```
 
 Then use it like the native binary: `bink cluster start`, `bink api expose`, etc.
@@ -67,7 +67,7 @@ podman run -d --name bink --privileged \
   --device /dev/kvm \
   -v bink-storage:/var/lib/containers \
   -v $(pwd):/output \
-  ghcr.io/alicefr/bink/bink:latest
+  ghcr.io/bootc-dev/bink/bink:latest
 
 # Wait for podman service to be ready inside the container
 until podman exec bink podman info &>/dev/null; do sleep 0.5; done

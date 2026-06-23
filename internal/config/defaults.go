@@ -15,11 +15,11 @@ const (
 
 	FedoraVersion = "43"
 
-	binkImageBase    = "ghcr.io/alicefr/bink/bink"
-	clusterImageBase = "ghcr.io/alicefr/bink/cluster"
-	dnsImageBase     = "ghcr.io/alicefr/bink/dns"
+	binkImageBase    = "ghcr.io/bootc-dev/bink/bink"
+	clusterImageBase = "ghcr.io/bootc-dev/bink/cluster"
+	dnsImageBase     = "ghcr.io/bootc-dev/bink/dns"
 
-	DefaultNodeImage = "ghcr.io/alicefr/bink/node:v1.35-fedora-44-disk"
+	DefaultNodeImage = "ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk"
 
 	DefaultBaseDisk = "/images/disk.qcow2"
 	DefaultControlPlaneMemory    = 1900
