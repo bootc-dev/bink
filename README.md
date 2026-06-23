@@ -116,3 +116,9 @@ bink cluster stop
 # Stop and also remove persistent data (SSH keys, kubeconfig)
 bink cluster stop --remove-data
 ```
+
+## Enable bink auto-completion
+
+```bash
+source <(bink completion bash)
+```
