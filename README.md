@@ -90,9 +90,8 @@ The `bink-storage` volume persists container images across runs so they don't ne
 # Create cluster with control plane
 bink cluster start
 
-# Access the cluster
-bink api expose
-export KUBECONFIG=$PWD/kubeconfig-podman
+# Create and export KUBECONFIG
+eval $(bink api expose)
 kubectl get pods -A
 
 # Add worker nodes (optional)
