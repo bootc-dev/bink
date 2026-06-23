@@ -17,7 +17,7 @@ Bink uses the Podman client API. Make sure you have a Podman socket (e.g.
 ## Installation
 
 ```bash
-go install ./cmd/bink
+make build-bink
 ```
 ## Running via Container
 
