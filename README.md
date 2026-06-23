@@ -1,6 +1,4 @@
 # bink
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbootc-dev%2Fbink.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbootc-dev%2Fbink?ref=badge_shield)
-
 
 A CLI tool for creating Kubernetes dev clusters from bootc images.
 
@@ -122,7 +120,3 @@ bink cluster stop
 # Stop and also remove persistent data (SSH keys, kubeconfig)
 bink cluster stop --remove-data
 ```
-
-
-## License
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbootc-dev%2Fbink.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbootc-dev%2Fbink?ref=badge_large)
