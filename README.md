@@ -19,9 +19,6 @@ Bink uses the Podman client API. Make sure you have a Podman socket (e.g.
 ```bash
 go install ./cmd/bink
 ```
-
-(We're working on making bink run as a container as well!)
-
 ## Running via Container
 
 Instead of building the binary locally, you can run bink directly from a container image:
