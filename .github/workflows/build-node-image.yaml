@@ -17,7 +17,7 @@ on:
         type: boolean
 
 env:
-  PUSH_REGISTRY: ghcr.io/alicefr/bink
+  PUSH_REGISTRY: ghcr.io/bootc-dev/bink
   PUSH_IMAGE: node
 
 jobs:
