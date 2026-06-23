@@ -7,7 +7,7 @@ BUILD_MEMORY ?= 4G
 BCVK_EXTRA_ARGS ?=
 
 IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
-REGISTRY ?= ghcr.io/alicefr/bink
+REGISTRY ?= ghcr.io/bootc-dev/bink
 BOOTC_IMAGE ?= $(REGISTRY)/node:$(IMAGE_TAG)
 NODE_IMAGE ?= $(REGISTRY)/node:$(IMAGE_TAG)-disk
 NODE_IMAGE_COMPOSEFS ?= $(REGISTRY)/node:$(IMAGE_TAG)-disk-composefs
