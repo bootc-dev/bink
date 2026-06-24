@@ -143,6 +143,12 @@ var _ = Describe("Cluster Lifecycle", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pod.Status.Phase).To(Equal(corev1.PodRunning))
 
+			By("Verifying pod can resolve registry.cluster.local via CoreDNS")
+			nslookupOutput, err := helpers.PodExec(kubeconfigPath, "default", "busybox-test",
+				[]string{"nslookup", "registry.cluster.local"})
+			Expect(err).ToNot(HaveOccurred(), "nslookup registry.cluster.local should succeed from pod")
+			Expect(nslookupOutput).To(ContainSubstring(config.RegistryStaticIP))
+
 			By("Cleaning up the busybox pod")
 			helpers.DeletePod(kubeClient, "default", "busybox-test")
 
