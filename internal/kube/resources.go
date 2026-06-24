@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	policyv1 "k8s.io/api/policy/v1"
@@ -124,6 +125,34 @@ func (c *Client) DeleteNode(ctx context.Context, nodeName string) error {
 	if err != nil {
 		return fmt.Errorf("deleting node %s: %w", nodeName, err)
 	}
+	return nil
+}
+
+// EnableCoreDNSFallthrough patches the CoreDNS ConfigMap so that unresolved
+// cluster.local queries fall through to the forward plugin (which reaches the
+// bink dnsmasq container via the node's /etc/resolv.conf).
+func (c *Client) EnableCoreDNSFallthrough(ctx context.Context) error {
+	cm, err := c.clientset.CoreV1().ConfigMaps("kube-system").Get(ctx, "coredns", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting coredns ConfigMap: %w", err)
+	}
+
+	corefile, ok := cm.Data["Corefile"]
+	if !ok {
+		return fmt.Errorf("Corefile key not found in coredns ConfigMap")
+	}
+
+	updated := strings.Replace(corefile, "fallthrough in-addr.arpa ip6.arpa", "fallthrough", 1)
+	if updated == corefile {
+		return nil
+	}
+
+	cm.Data["Corefile"] = updated
+	_, err = c.clientset.CoreV1().ConfigMaps("kube-system").Update(ctx, cm, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("updating coredns ConfigMap: %w", err)
+	}
+
 	return nil
 }
 
