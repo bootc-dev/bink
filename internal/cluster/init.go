@@ -135,6 +135,14 @@ func (c *Cluster) Init(ctx context.Context, opts InitOptions) error {
 		return fmt.Errorf("failed to install CoreDNS: %w", err)
 	}
 
+	// Enable fallthrough in CoreDNS so that non-Kubernetes cluster.local names
+	// (e.g. registry.cluster.local) are forwarded to the bink DNS container.
+	c.logger.Info("")
+	c.logger.Info("=== Patching CoreDNS for cluster.local fallthrough ===")
+	if err := kubeClient.EnableCoreDNSFallthrough(ctx); err != nil {
+		return fmt.Errorf("failed to enable CoreDNS fallthrough: %w", err)
+	}
+
 	// Patch CoreDNS to run as root - CRI-O doesn't set ambient capabilities
 	// for non-root users, so NET_BIND_SERVICE doesn't take effect for UID 65532
 	c.logger.Info("")
