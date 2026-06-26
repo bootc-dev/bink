@@ -1,0 +1,152 @@
+name: Integration Tests (composefs)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: integration-composefs-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  BINK_IMAGES: >-
+    ghcr.io/bootc-dev/bink/cluster:latest
+    ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs
+    ghcr.io/bootc-dev/bink/dns:latest
+  EXTERNAL_IMAGES: >-
+    quay.io/libpod/busybox:latest
+
+jobs:
+  integration-tests-composefs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kernel for nested containers
+        run: |
+          sudo aa-teardown 2>/dev/null || true
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+      - name: Enable KSM (Kernel Same-page Merging)
+        run: |
+          sudo sh -c 'echo 1 > /sys/kernel/mm/ksm/run'
+          sudo sh -c 'echo 5000 > /sys/kernel/mm/ksm/pages_to_scan'
+          cat /sys/kernel/mm/ksm/run
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            podman \
+            libgpgme-dev \
+            libbtrfs-dev \
+            libdevmapper-dev \
+            pkg-config
+
+      - name: Set up KVM
+        run: |
+          sudo chmod 666 /dev/kvm
+          ls -la /dev/kvm
+
+      - name: Configure Podman
+        run: |
+          podman --version
+          sudo mkdir -p /etc/containers
+          echo '{"defaultAction":"SCMP_ACT_ALLOW"}' | sudo tee /etc/containers/seccomp.json
+          printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "/etc/containers/seccomp.json"\n' | sudo tee /etc/containers/containers.conf
+          grep -q '^root:' /etc/subuid || echo 'root:100000:65536' | sudo tee -a /etc/subuid
+          grep -q '^root:' /etc/subgid || echo 'root:100000:65536' | sudo tee -a /etc/subgid
+          sudo systemctl start podman.socket
+          sudo podman info --format '{{.Store.GraphRoot}}'
+
+      - name: Build bink binary
+        run: sudo make build-bink
+
+      - name: Verify prerequisites
+        run: |
+          test -f ./bink
+          sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+          df -h /
+          free -h
+
+      - name: Get image digests
+        id: digests
+        run: |
+          ALL_DIGESTS=""
+          for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
+            digest=$(skopeo inspect --no-creds "docker://${img}" --format '{{.Digest}}')
+            echo "${img}: ${digest}"
+            ALL_DIGESTS="${ALL_DIGESTS}${digest}"
+          done
+          echo "hash=$(echo -n "${ALL_DIGESTS}" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore cached images
+        id: image-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/podman-image-cache
+          key: podman-images-v2-composefs-${{ steps.digests.outputs.hash }}
+
+      - name: Load cached images
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: |
+          for f in /tmp/podman-image-cache/*.tar; do
+            sudo podman load -i "$f"
+          done
+          sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+
+      - name: Pre-pull container images
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/podman-image-cache
+          for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
+            sudo podman pull "$img"
+            name=$(echo "$img" | sed 's|[/:]|_|g')
+            sudo podman save -o "/tmp/podman-image-cache/${name}.tar" "$img"
+          done
+          sudo chown -R $(id -u):$(id -g) /tmp/podman-image-cache
+
+      - name: Save image cache
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/podman-image-cache
+          key: podman-images-v2-composefs-${{ steps.digests.outputs.hash }}
+
+      - name: Run composefs integration tests
+        run: sudo make test-integration-composefs
+        timeout-minutes: 90
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
+          BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs
+
+      - name: Collect logs
+        if: failure()
+        run: .github/collect-logs.sh
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-composefs
+          path: /tmp/bink-logs/
+
+      - name: Cleanup test clusters
+        if: always()
+        run: |
+          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r sudo podman rm -f 2>/dev/null || true
+          sudo podman volume prune -f 2>/dev/null || true
