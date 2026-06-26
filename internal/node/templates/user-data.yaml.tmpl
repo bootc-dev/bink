@@ -88,8 +88,8 @@ runcmd:
 {{- if .TargetImgRef}}
   - |
     mount -o remount,rw /sysroot
-    DEPLOY_PATH=$(bootc status --json | jq -r '.status.booted.ostree.deploySerial // empty')
-    CHECKSUM=$(bootc status --json | jq -r '.status.booted.ostree.checksum')
-    ORIGIN="/ostree/deploy/default/deploy/${CHECKSUM}.${DEPLOY_PATH}.origin"
-    sed -i 's|^container-image-reference=.*|container-image-reference=ostree-unverified-registry:{{.TargetImgRef}}|' "$ORIGIN"
+    ORIGIN=$(find /ostree/deploy/default/deploy/ /sysroot/state/deploy/ -name "*.origin" -type f 2>/dev/null | head -1)
+    if [ -n "$ORIGIN" ]; then
+      sed -i '/^container-image-reference/s|=.*|= ostree-unverified-registry:{{.TargetImgRef}}|' "$ORIGIN"
+    fi
 {{- end}}
