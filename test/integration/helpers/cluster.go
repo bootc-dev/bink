@@ -5,14 +5,25 @@ package helpers
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
+	"github.com/bootc-dev/bink/internal/config"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
+
+// NodeImage returns the node image to use for tests.
+// It reads BINK_NODE_IMAGE env var, falling back to config.DefaultNodeImage.
+func NodeImage() string {
+	if img := os.Getenv("BINK_NODE_IMAGE"); img != "" {
+		return img
+	}
+	return config.DefaultNodeImage
+}
 
 // GenerateTestClusterName creates a unique cluster name for testing
 func GenerateTestClusterName() string {
@@ -45,7 +56,7 @@ func RunCommand(cmd *exec.Cmd, timeout ...time.Duration) *gexec.Session {
 // Uses auto-assigned ports (--api-port 0) to avoid port conflicts in tests
 func CreateCluster(name string) {
 	GinkgoWriter.Printf("Creating cluster: %s (with auto-assigned API port)\n", name)
-	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0", "--memory", "1900", "--max-memory", "4096")
+	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-image", NodeImage())
 	session := RunCommand(cmd, 10*time.Minute)
 	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
 }
@@ -53,7 +64,7 @@ func CreateCluster(name string) {
 // CreateClusterWithNodeName creates a cluster with a custom control-plane node name
 func CreateClusterWithNodeName(name, nodeName string) {
 	GinkgoWriter.Printf("Creating cluster: %s with node name: %s (with auto-assigned API port)\n", name, nodeName)
-	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--node-name", nodeName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096")
+	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--node-name", nodeName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-image", NodeImage())
 	session := RunCommand(cmd, 10*time.Minute)
 	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
 }
