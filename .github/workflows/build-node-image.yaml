@@ -21,8 +21,25 @@ env:
   PUSH_IMAGE: node
 
 jobs:
-  build:
+  supported-versions:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Get supported Kubernetes versions
+        id: set-matrix
+        run: |
+          MATRIX=$(curl -s https://endoflife.date/api/kubernetes.json | \
+            jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
+          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: supported-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kube-minor: ${{ fromJson(needs.supported-versions.outputs.matrix) }}
     permissions:
       contents: read
       packages: write
@@ -42,13 +59,13 @@ jobs:
 
       - name: Build bootc image
         working-directory: node-images/fedora
-        run: make build-bootc-image
+        run: make build-bootc-image KUBE_MINOR=${{ matrix.kube-minor }}
 
       - name: Determine image tag
         id: meta
         working-directory: node-images/fedora
         run: |
-          TAG=$(make -s print-image-tag)
+          TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Image tag: ${TAG}"
 
@@ -58,19 +75,17 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          BOOTC_SRC=$(make -s print-bootc-image)
+          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
           podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
           podman push --digestfile=/tmp/bootc-digest ${PUSH_DEST}:${TAG}
-          podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
-          podman push ${PUSH_DEST}:latest
 
           BOOTC_DIGEST=$(cat /tmp/bootc-digest)
           echo "digest=${BOOTC_DIGEST}" >> "$GITHUB_OUTPUT"
           echo "Bootc image pushed with digest: ${BOOTC_DIGEST}"
           echo "Clean up local images"
-          podman rmi -f ${BOOTC_SRC} ${PUSH_DEST}:${TAG} ${PUSH_DEST}:latest
+          podman rmi -f ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
           echo "push_dest=${PUSH_DEST}:${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Build disk image
@@ -80,9 +95,9 @@ jobs:
           PUSH_DEST="${{ steps.push-bootc.outputs.push_dest }}"
           if [ -n "${BOOTC_DIGEST}" ] && [ -n "${PUSH_DEST}" ]; then
             podman pull "${PUSH_DEST}"
-            make build-disk-image BOOTC_IMAGE="${PUSH_DEST}" BOOTC_DIGEST="${BOOTC_DIGEST}"
+            make build-disk-image KUBE_MINOR=${{ matrix.kube-minor }} BOOTC_IMAGE="${PUSH_DEST}" BOOTC_DIGEST="${BOOTC_DIGEST}"
           else
-            make build-disk-image
+            make build-disk-image KUBE_MINOR=${{ matrix.kube-minor }}
           fi
 
       - name: Push disk image
@@ -90,13 +105,11 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          DISK_SRC=$(make -s print-node-image)
+          DISK_SRC=$(make -s print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
           podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk
           podman push ${PUSH_DEST}:${TAG}-disk
-          podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk
-          podman push ${PUSH_DEST}:latest-disk
 
       - name: Build composefs disk image
         working-directory: node-images/fedora
@@ -104,9 +117,9 @@ jobs:
           BOOTC_DIGEST="${{ steps.push-bootc.outputs.digest }}"
           PUSH_DEST="${{ steps.push-bootc.outputs.push_dest }}"
           if [ -n "${BOOTC_DIGEST}" ] && [ -n "${PUSH_DEST}" ]; then
-            make build-disk-image-composefs BOOTC_IMAGE="${PUSH_DEST}" BOOTC_DIGEST="${BOOTC_DIGEST}"
+            make build-disk-image-composefs KUBE_MINOR=${{ matrix.kube-minor }} BOOTC_IMAGE="${PUSH_DEST}" BOOTC_DIGEST="${BOOTC_DIGEST}"
           else
-            make build-disk-image-composefs
+            make build-disk-image-composefs KUBE_MINOR=${{ matrix.kube-minor }}
           fi
 
       - name: Push composefs disk image
@@ -114,10 +127,8 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          DISK_SRC=$(make -s print-node-image-composefs)
+          DISK_SRC=$(make -s print-node-image-composefs KUBE_MINOR=${{ matrix.kube-minor }})
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
           podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk-composefs
           podman push ${PUSH_DEST}:${TAG}-disk-composefs
-          podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk-composefs
-          podman push ${PUSH_DEST}:latest-disk-composefs
