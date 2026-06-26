@@ -33,7 +33,7 @@ var _ = Describe("Cluster Lifecycle", func() {
 			helpers.CleanupCluster(clusterName)
 		})
 
-		It("should create and initialize a complete Kubernetes cluster", func() {
+		It("should create and initialize a complete Kubernetes cluster", Label("composefs"), func() {
 			customNodeName := "cp1"
 			kubeconfigPath := fmt.Sprintf("../../kubeconfig-%s", clusterName)
 			defer helpers.CleanupKubeconfig(kubeconfigPath)
@@ -41,7 +41,11 @@ var _ = Describe("Cluster Lifecycle", func() {
 			targetImgRef := "registry.cluster.local:5000/node:latest"
 
 			By("Creating cluster with --expose, custom node name, memory ballooning, and target-imgref")
-			cmd := helpers.BinkCmd("cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-name", customNodeName, "--expose", kubeconfigPath, "--target-imgref", targetImgRef)
+			args := []string{"cluster", "start", "--cluster-name", clusterName, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-name", customNodeName, "--expose", kubeconfigPath, "--target-imgref", targetImgRef}
+			if nodeImage := os.Getenv("BINK_NODE_IMAGE"); nodeImage != "" {
+				args = append(args, "--node-image", nodeImage)
+			}
+			cmd := helpers.BinkCmd(args...)
 			session := helpers.RunCommand(cmd)
 
 			By("Verifying cluster creation command succeeded")
