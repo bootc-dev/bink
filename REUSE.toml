@@ -67,3 +67,9 @@ path = "test-cluster.sh"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The bink Authors"
 SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "renovate.json"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
