@@ -71,7 +71,7 @@ func waitForAPI(ctx context.Context, config *rest.Config) error {
 		return err
 	}
 
-	deadline := time.After(2 * time.Minute)
+	deadline := time.After(5 * time.Minute)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
