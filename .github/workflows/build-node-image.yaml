@@ -51,7 +51,7 @@ jobs:
         run: dnf install -y --setopt=install_weak_deps=0 podman git make
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Log in to GHCR
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)

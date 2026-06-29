@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up KVM
         run: |
@@ -71,7 +71,7 @@ jobs:
 
       - name: Restore cached images
         id: image-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: /tmp/podman-image-cache
           key: podman-images-v2-container-test-${{ steps.digests.outputs.hash }}
@@ -97,7 +97,7 @@ jobs:
 
       - name: Save image cache
         if: steps.image-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: /tmp/podman-image-cache
           key: podman-images-v2-container-test-${{ steps.digests.outputs.hash }}
