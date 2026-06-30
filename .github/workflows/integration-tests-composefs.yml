@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure kernel for nested containers
         run: |
@@ -41,7 +41,7 @@ jobs:
           cat /sys/kernel/mm/ksm/run
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -95,7 +95,7 @@ jobs:
 
       - name: Restore cached images
         id: image-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: /tmp/podman-image-cache
           key: podman-images-v2-composefs-${{ steps.digests.outputs.hash }}
@@ -121,7 +121,7 @@ jobs:
 
       - name: Save image cache
         if: steps.image-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: /tmp/podman-image-cache
           key: podman-images-v2-composefs-${{ steps.digests.outputs.hash }}
@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-logs-composefs
           path: /tmp/bink-logs/
