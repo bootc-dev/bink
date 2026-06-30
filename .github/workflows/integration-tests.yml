@@ -21,6 +21,21 @@ env:
     quay.io/libpod/busybox:latest
 
 jobs:
+  supported-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Get supported Kubernetes versions
+        id: set-matrix
+        run: |
+          DEFAULT="1.35"
+          # Exclude the default version — the integration-tests job already runs the full suite for it
+          MATRIX=$(curl -s https://endoflife.date/api/kubernetes.json | \
+            jq -c --arg default "$DEFAULT" \
+              '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3] | map(select(. != $default))')
+          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+
   integration-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -29,111 +44,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Configure kernel for nested containers
-        run: |
-          # Unload all AppArmor profiles from the kernel.
-          # Stopping the service alone doesn't unload them - the passt profile
-          # blocks remount operations needed for passt's self-sandboxing.
-          sudo aa-teardown 2>/dev/null || true
-          # Allow unprivileged user namespace creation (needed by passt inside containers)
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-
-      - name: Enable KSM (Kernel Same-page Merging)
-        run: |
-          sudo sh -c 'echo 1 > /sys/kernel/mm/ksm/run'
-          sudo sh -c 'echo 5000 > /sys/kernel/mm/ksm/pages_to_scan'
-          cat /sys/kernel/mm/ksm/run
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Setup bink
+        uses: ./.github/actions/setup-bink
         with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            podman \
-            libgpgme-dev \
-            libbtrfs-dev \
-            libdevmapper-dev \
-            pkg-config
-
-      - name: Set up KVM
-        run: |
-          # Re-apply after apt-get which may upgrade udev and reset device permissions
-          sudo chmod 666 /dev/kvm
-          ls -la /dev/kvm
-
-      - name: Configure Podman
-        run: |
-          podman --version
-          # Configure containers.conf BEFORE starting the podman socket
-          sudo mkdir -p /etc/containers
-          echo '{"defaultAction":"SCMP_ACT_ALLOW"}' | sudo tee /etc/containers/seccomp.json
-          printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "/etc/containers/seccomp.json"\n' | sudo tee /etc/containers/containers.conf
-          # Ensure subuid/subgid for root (needed for userns=auto)
-          grep -q '^root:' /etc/subuid || echo 'root:100000:65536' | sudo tee -a /etc/subuid
-          grep -q '^root:' /etc/subgid || echo 'root:100000:65536' | sudo tee -a /etc/subgid
-          sudo systemctl start podman.socket
-          sudo podman info --format '{{.Store.GraphRoot}}'
-
-      - name: Build bink binary
-        run: sudo make build-bink
-
-      - name: Verify prerequisites
-        run: |
-          test -f ./bink
-          sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
-          df -h /
-          free -h
-
-      - name: Get image digests
-        id: digests
-        run: |
-          ALL_DIGESTS=""
-          for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
-            digest=$(skopeo inspect --no-creds "docker://${img}" --format '{{.Digest}}')
-            echo "${img}: ${digest}"
-            ALL_DIGESTS="${ALL_DIGESTS}${digest}"
-          done
-          echo "hash=$(echo -n "${ALL_DIGESTS}" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore cached images
-        id: image-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: /tmp/podman-image-cache
-          key: podman-images-v2-integration-${{ steps.digests.outputs.hash }}
-
-      - name: Load cached images
-        if: steps.image-cache.outputs.cache-hit == 'true'
-        run: |
-          for f in /tmp/podman-image-cache/*.tar; do
-            sudo podman load -i "$f"
-          done
-          sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
-
-      - name: Pre-pull container images
-        if: steps.image-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/podman-image-cache
-          for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
-            sudo podman pull "$img"
-            name=$(echo "$img" | sed 's|[/:]|_|g')
-            sudo podman save -o "/tmp/podman-image-cache/${name}.tar" "$img"
-          done
-          sudo chown -R $(id -u):$(id -g) /tmp/podman-image-cache
-
-      - name: Save image cache
-        if: steps.image-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: /tmp/podman-image-cache
-          key: podman-images-v2-integration-${{ steps.digests.outputs.hash }}
+          cache-key-prefix: integration
 
       - name: Run integration tests
         run: sudo make test-integration TEST_PROCS=2
@@ -150,6 +64,56 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-logs
+          path: /tmp/bink-logs/
+
+      - name: Cleanup test clusters
+        if: always()
+        run: |
+          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r sudo podman rm -f 2>/dev/null || true
+          sudo podman volume prune -f 2>/dev/null || true
+
+  integration-tests-k8s-versions:
+    needs: supported-versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        kube-minor: ${{ fromJson(needs.supported-versions.outputs.matrix) }}
+
+    env:
+      BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-44-disk
+      BINK_IMAGES: >-
+        ghcr.io/bootc-dev/bink/cluster:latest
+        ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-44-disk
+        ghcr.io/bootc-dev/bink/dns:latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup bink
+        uses: ./.github/actions/setup-bink
+        with:
+          cache-key-prefix: k8s-${{ matrix.kube-minor }}
+
+      - name: Run integration tests (K8s ${{ matrix.kube-minor }})
+        run: sudo make test-integration GINKGO_FOCUS="should create and initialize a complete Kubernetes cluster"
+        timeout-minutes: 90
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
+          BINK_NODE_IMAGE: ${{ env.BINK_NODE_IMAGE }}
+
+      - name: Collect logs
+        if: failure()
+        run: .github/collect-logs.sh
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-logs-k8s-${{ matrix.kube-minor }}
           path: /tmp/bink-logs/
 
       - name: Cleanup test clusters

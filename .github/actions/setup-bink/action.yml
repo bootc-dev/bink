@@ -25,7 +25,7 @@ runs:
         cat /sys/kernel/mm/ksm/run
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
         cache: true
@@ -85,7 +85,7 @@ runs:
 
     - name: Restore cached images
       id: image-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: /tmp/podman-image-cache
         key: podman-images-v2-${{ inputs.cache-key-prefix }}-${{ steps.digests.outputs.hash }}
@@ -113,7 +113,7 @@ runs:
 
     - name: Save image cache
       if: steps.image-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: /tmp/podman-image-cache
         key: podman-images-v2-${{ inputs.cache-key-prefix }}-${{ steps.digests.outputs.hash }}
