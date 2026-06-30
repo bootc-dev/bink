@@ -1,0 +1,119 @@
+name: Setup Bink
+description: Configure the runner, build bink, and cache container images
+
+inputs:
+  cache-key-prefix:
+    description: Prefix for the image cache key
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Configure kernel for nested containers
+      shell: bash
+      run: |
+        sudo aa-teardown 2>/dev/null || true
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+    - name: Enable KSM (Kernel Same-page Merging)
+      shell: bash
+      run: |
+        sudo sh -c 'echo 1 > /sys/kernel/mm/ksm/run'
+        sudo sh -c 'echo 5000 > /sys/kernel/mm/ksm/pages_to_scan'
+        cat /sys/kernel/mm/ksm/run
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          podman \
+          libgpgme-dev \
+          libbtrfs-dev \
+          libdevmapper-dev \
+          pkg-config
+
+    - name: Set up KVM
+      shell: bash
+      run: |
+        sudo chmod 666 /dev/kvm
+        ls -la /dev/kvm
+
+    - name: Configure Podman
+      shell: bash
+      run: |
+        podman --version
+        sudo mkdir -p /etc/containers
+        echo '{"defaultAction":"SCMP_ACT_ALLOW"}' | sudo tee /etc/containers/seccomp.json
+        printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "/etc/containers/seccomp.json"\n' | sudo tee /etc/containers/containers.conf
+        grep -q '^root:' /etc/subuid || echo 'root:100000:65536' | sudo tee -a /etc/subuid
+        grep -q '^root:' /etc/subgid || echo 'root:100000:65536' | sudo tee -a /etc/subgid
+        sudo systemctl start podman.socket
+        sudo podman info --format '{{.Store.GraphRoot}}'
+
+    - name: Build bink binary
+      shell: bash
+      run: sudo make build-bink
+
+    - name: Verify prerequisites
+      shell: bash
+      run: |
+        test -f ./bink
+        sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+        df -h /
+        free -h
+
+    - name: Get image digests
+      id: digests
+      shell: bash
+      run: |
+        ALL_DIGESTS=""
+        for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
+          digest=$(skopeo inspect --no-creds "docker://${img}" --format '{{.Digest}}')
+          echo "${img}: ${digest}"
+          ALL_DIGESTS="${ALL_DIGESTS}${digest}"
+        done
+        echo "hash=$(echo -n "${ALL_DIGESTS}" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore cached images
+      id: image-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: /tmp/podman-image-cache
+        key: podman-images-v2-${{ inputs.cache-key-prefix }}-${{ steps.digests.outputs.hash }}
+
+    - name: Load cached images
+      if: steps.image-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        for f in /tmp/podman-image-cache/*.tar; do
+          sudo podman load -i "$f"
+        done
+        sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+
+    - name: Pre-pull container images
+      if: steps.image-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p /tmp/podman-image-cache
+        for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
+          sudo podman pull "$img"
+          name=$(echo "$img" | sed 's|[/:]|_|g')
+          sudo podman save -o "/tmp/podman-image-cache/${name}.tar" "$img"
+        done
+        sudo chown -R $(id -u):$(id -g) /tmp/podman-image-cache
+
+    - name: Save image cache
+      if: steps.image-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/podman-image-cache
+        key: podman-images-v2-${{ inputs.cache-key-prefix }}-${{ steps.digests.outputs.hash }}
