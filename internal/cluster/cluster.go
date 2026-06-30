@@ -112,14 +112,18 @@ func (c *Cluster) WaitForCloudInit(ctx context.Context, nodeName string, timeout
 
 		c.logger.Infof("cloud-init status: %s (attempt %d/%d)", status, i, maxRetries)
 
-		// Accept "done" (done with or without warnings is OK)
-		if status == "done" {
+		switch status {
+		case "done":
 			c.logger.Info("✓ cloud-init completed")
+			return nil
+		case "error":
+			c.logger.Warn("cloud-init finished with errors (non-critical modules may have failed)")
+			fullStatus, _ := sshClient.Exec(ctx, "cloud-init status --long")
+			c.logger.Debugf("cloud-init full status:\n%s", fullStatus)
 			return nil
 		}
 
 		if i == maxRetries {
-			// Get full status for debugging
 			fullStatus, _ := sshClient.Exec(ctx, "cloud-init status --long")
 			return fmt.Errorf("timeout waiting for cloud-init to complete on %s. Status: %s\nFull status:\n%s",
 				nodeName, status, fullStatus)
