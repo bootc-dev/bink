@@ -56,6 +56,7 @@ runs:
         printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "/etc/containers/seccomp.json"\n' | sudo tee /etc/containers/containers.conf
         grep -q '^root:' /etc/subuid || echo 'root:100000:65536' | sudo tee -a /etc/subuid
         grep -q '^root:' /etc/subgid || echo 'root:100000:65536' | sudo tee -a /etc/subgid
+        printf 'unqualified-search-registries = ["docker.io"]\n' | sudo tee /etc/containers/registries.conf
         sudo systemctl start podman.socket
         sudo podman info --format '{{.Store.GraphRoot}}'
 
