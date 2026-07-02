@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/podman/v5/pkg/specgen"
+	"go.podman.io/podman/v6/pkg/specgen"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 

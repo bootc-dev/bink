@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containers/podman/v5/pkg/bindings"
+	"go.podman.io/podman/v6/pkg/bindings"
 )
 
 // newTestClient creates a Client connected to a fake Podman API server.
