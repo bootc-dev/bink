@@ -14,16 +14,16 @@ import (
 	"strings"
 
 	"github.com/bootc-dev/bink/internal/config"
-	"github.com/containers/podman/v5/pkg/api/handlers"
-	"github.com/containers/podman/v5/pkg/bindings"
-	"github.com/containers/podman/v5/pkg/bindings/containers"
-	"github.com/containers/podman/v5/pkg/bindings/images"
-	"github.com/containers/podman/v5/pkg/bindings/network"
-	"github.com/containers/podman/v5/pkg/bindings/volumes"
-	"github.com/containers/podman/v5/pkg/domain/entities"
-	"github.com/containers/podman/v5/pkg/specgen"
+	"go.podman.io/podman/v6/pkg/api/handlers"
+	"go.podman.io/podman/v6/pkg/bindings"
+	"go.podman.io/podman/v6/pkg/bindings/containers"
+	"go.podman.io/podman/v6/pkg/bindings/images"
+	"go.podman.io/podman/v6/pkg/bindings/network"
+	"go.podman.io/podman/v6/pkg/bindings/volumes"
+	"go.podman.io/podman/v6/pkg/domain/entities"
+	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/sirupsen/logrus"
-	nettypes "github.com/containers/common/libnetwork/types"
+	nettypes "go.podman.io/common/libnetwork/types"
 )
 
 type Client struct {
