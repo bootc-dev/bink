@@ -3,8 +3,6 @@ module github.com/bootc-dev/bink
 go 1.25.8
 
 require (
-	github.com/containers/common v0.63.1
-	github.com/containers/podman/v5 v5.5.2
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
@@ -12,6 +10,8 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	go.podman.io/common v0.68.0
+	go.podman.io/podman/v6 v6.0.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
