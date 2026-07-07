@@ -1,4 +1,5 @@
-FROM registry.fedoraproject.org/fedora-minimal
+ARG FEDORA_VERSION=44
+FROM registry.fedoraproject.org/fedora-minimal:${FEDORA_VERSION}
 
 RUN microdnf install -y dnsmasq && microdnf clean all
 
