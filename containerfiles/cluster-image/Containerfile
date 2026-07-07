@@ -1,4 +1,4 @@
-ARG FEDORA_VERSION=43
+ARG FEDORA_VERSION=44
 FROM quay.io/fedora/fedora:${FEDORA_VERSION}
 
 RUN dnf install -y --setopt=install_weak_deps=0 \

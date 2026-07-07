@@ -13,21 +13,19 @@ const (
 	DefaultNetworkName = "podman"
 	DefaultSubnet      = "10.88.0.0/16"
 
-	FedoraVersion = "43"
-
 	binkImageBase    = "ghcr.io/bootc-dev/bink/bink"
 	clusterImageBase = "ghcr.io/bootc-dev/bink/cluster"
 	dnsImageBase     = "ghcr.io/bootc-dev/bink/dns"
 
 	DefaultNodeImage = "ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk"
 
-	DefaultBaseDisk = "/images/disk.qcow2"
+	DefaultBaseDisk              = "/images/disk.qcow2"
 	DefaultControlPlaneMemory    = 1900
 	DefaultControlPlaneMaxMemory = 4096
 	DefaultWorkerMemory          = 768
 	DefaultWorkerMaxMemory       = 2048
 	DefaultVCPUs                 = 2
-	DefaultDiskSize = "10G"
+	DefaultDiskSize              = "10G"
 
 	DefaultSSHPort      = 2222
 	DefaultSSHUser      = "core"

@@ -7,7 +7,6 @@ extract = $(shell grep '$(1)' $(DEFAULTS_GO) | head -1 | sed 's/.*"\(.*\)"/\1/')
 BINK_IMAGE := $(call extract,binkImageBase ):latest
 CLUSTER_IMAGE := $(call extract,clusterImageBase ):latest
 DNS_IMAGE := $(call extract,dnsImageBase ):latest
-FEDORA_VERSION := $(call extract,FedoraVersion )
 
 # Binary
 BINK_BINARY := bink
@@ -40,13 +39,13 @@ build-bink:
 # Build the bink CLI container image
 build-bink-image:
 	@echo "=== Building bink CLI container image ==="
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg VERSION=$(VERSION) -t $(BINK_IMAGE) -f Containerfile .
+	podman build --build-arg VERSION=$(VERSION) -t $(BINK_IMAGE) -f Containerfile .
 	@echo "✅ Bink CLI image built: $(BINK_IMAGE)"
 
 # Build the cluster container image
 build-cluster-image:
 	@echo "=== Building cluster container image ==="
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
+	podman build -t $(CLUSTER_IMAGE) -f $(VM_DIR)/Containerfile $(VM_DIR)
 	@echo "✅ Cluster image built: $(CLUSTER_IMAGE)"
 
 # Build the DNS container image
