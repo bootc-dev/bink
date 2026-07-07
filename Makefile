@@ -40,7 +40,6 @@ build-bink:
 # Build the bink CLI container image
 build-bink-image:
 	@echo "=== Building bink CLI container image ==="
-	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg VERSION=$(VERSION) --target builder -t localhost/bink-builder:latest -f Containerfile .
 	podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) --build-arg VERSION=$(VERSION) -t $(BINK_IMAGE) -f Containerfile .
 	@echo "✅ Bink CLI image built: $(BINK_IMAGE)"
 
