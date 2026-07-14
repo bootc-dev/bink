@@ -5,6 +5,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      build-node-images:
+        description: "Force building node images"
+        required: false
+        default: false
+        type: boolean
+      push-node-images:
+        description: "Push built node images to GHCR"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: integration-${{ github.head_ref || github.ref }}
@@ -19,8 +31,26 @@ env:
     docker.io/library/registry:2
     docker.io/library/haproxy:lts-alpine
     quay.io/libpod/busybox:latest
+  PUSH_REGISTRY: ghcr.io/bootc-dev/bink
+  PUSH_IMAGE: node
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      node-images: ${{ steps.filter.outputs.node-images }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            node-images:
+              - 'node-images/fedora/**'
+
   supported-versions:
     runs-on: ubuntu-latest
     outputs:
@@ -36,6 +66,74 @@ jobs:
           NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
           echo "all-versions=${ALL}" >> "$GITHUB_OUTPUT"
           echo "non-default-versions=${NON_DEFAULT}" >> "$GITHUB_OUTPUT"
+
+  build-node-images:
+    needs: [changes, supported-versions]
+    if: needs.changes.outputs.node-images == 'true' || inputs.build-node-images == true
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kube-minor: ${{ fromJson(needs.supported-versions.outputs.all-versions) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build bootc image
+        working-directory: node-images/fedora
+        run: sudo make build-bootc-image KUBE_MINOR=${{ matrix.kube-minor }}
+
+      - name: Determine image tag
+        id: meta
+        working-directory: node-images/fedora
+        run: |
+          TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${TAG}"
+
+      - name: Save bootc image
+        working-directory: node-images/fedora
+        run: |
+          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
+          sudo podman save -o ${{ github.workspace }}/bootc-image.tar ${BOOTC_SRC}
+
+      - name: Upload bootc image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bootc-image-${{ matrix.kube-minor }}
+          path: bootc-image.tar
+
+      - name: Build disk image
+        working-directory: node-images/fedora
+        run: sudo make build-disk-image KUBE_MINOR=${{ matrix.kube-minor }}
+
+      - name: Save disk image
+        working-directory: node-images/fedora
+        run: |
+          DISK_SRC=$(make -s print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
+          sudo podman save -o ${{ github.workspace }}/node-image.tar ${DISK_SRC}
+
+      - name: Upload disk image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: node-image-${{ matrix.kube-minor }}
+          path: node-image.tar
+
+      - name: Build composefs disk image
+        working-directory: node-images/fedora
+        run: sudo make build-disk-image-composefs KUBE_MINOR=${{ matrix.kube-minor }}
+
+      - name: Save composefs disk image
+        working-directory: node-images/fedora
+        run: |
+          DISK_SRC=$(make -s print-node-image-composefs KUBE_MINOR=${{ matrix.kube-minor }})
+          sudo podman save -o ${{ github.workspace }}/node-image-composefs.tar ${DISK_SRC}
+
+      - name: Upload composefs disk image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: node-image-composefs-${{ matrix.kube-minor }}
+          path: node-image-composefs.tar
 
   integration-tests:
     runs-on: ubuntu-latest
