@@ -73,6 +73,52 @@ jobs:
             xargs -r sudo podman rm -f 2>/dev/null || true
           sudo podman volume prune -f 2>/dev/null || true
 
+  integration-tests-composefs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      BINK_IMAGES: >-
+        ghcr.io/bootc-dev/bink/cluster:latest
+        ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs
+        ghcr.io/bootc-dev/bink/dns:latest
+      EXTERNAL_IMAGES: >-
+        quay.io/libpod/busybox:latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup bink
+        uses: ./.github/actions/setup-bink
+        with:
+          cache-key-prefix: composefs
+
+      - name: Run composefs integration tests
+        run: sudo make test-integration-composefs
+        timeout-minutes: 90
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
+          BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs
+
+      - name: Collect logs
+        if: failure()
+        run: .github/collect-logs.sh
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-logs-composefs
+          path: /tmp/bink-logs/
+
+      - name: Cleanup test clusters
+        if: always()
+        run: |
+          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r sudo podman rm -f 2>/dev/null || true
+          sudo podman volume prune -f 2>/dev/null || true
+
   integration-tests-k8s-versions:
     needs: supported-versions
     runs-on: ubuntu-latest
