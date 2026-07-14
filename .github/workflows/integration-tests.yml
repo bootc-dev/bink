@@ -24,17 +24,18 @@ jobs:
   supported-versions:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      all-versions: ${{ steps.set-matrix.outputs.all-versions }}
+      non-default-versions: ${{ steps.set-matrix.outputs.non-default-versions }}
     steps:
       - name: Get supported Kubernetes versions
         id: set-matrix
         run: |
           DEFAULT="1.35"
-          # Exclude the default version — the integration-tests job already runs the full suite for it
-          MATRIX=$(curl -s https://endoflife.date/api/kubernetes.json | \
-            jq -c --arg default "$DEFAULT" \
-              '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3] | map(select(. != $default))')
-          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+          ALL=$(curl -s https://endoflife.date/api/kubernetes.json | \
+            jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
+          NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
+          echo "all-versions=${ALL}" >> "$GITHUB_OUTPUT"
+          echo "non-default-versions=${NON_DEFAULT}" >> "$GITHUB_OUTPUT"
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -126,7 +127,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kube-minor: ${{ fromJson(needs.supported-versions.outputs.matrix) }}
+        kube-minor: ${{ fromJson(needs.supported-versions.outputs.non-default-versions) }}
 
     env:
       BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-44-disk
