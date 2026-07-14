@@ -25,7 +25,6 @@ concurrency:
 env:
   BINK_IMAGES: >-
     ghcr.io/bootc-dev/bink/cluster:latest
-    ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk
     ghcr.io/bootc-dev/bink/dns:latest
   EXTERNAL_IMAGES: >-
     docker.io/library/registry:2
@@ -176,14 +175,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
-    env:
-      BINK_IMAGES: >-
-        ghcr.io/bootc-dev/bink/cluster:latest
-        ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs
-        ghcr.io/bootc-dev/bink/dns:latest
-      EXTERNAL_IMAGES: >-
-        quay.io/libpod/busybox:latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -229,10 +220,6 @@ jobs:
 
     env:
       BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-44-disk
-      BINK_IMAGES: >-
-        ghcr.io/bootc-dev/bink/cluster:latest
-        ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-44-disk
-        ghcr.io/bootc-dev/bink/dns:latest
 
     steps:
       - name: Checkout code
