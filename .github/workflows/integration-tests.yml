@@ -135,6 +135,9 @@ jobs:
           path: node-image-composefs.tar
 
   integration-tests:
+    needs: [changes, build-node-images]
+    # Run when build-node-images is skipped (no node image changes) or succeeded, but not when it failed
+    if: ${{ !cancelled() && needs.build-node-images.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -142,10 +145,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Download node image artifact
+        if: needs.build-node-images.result == 'success'
+        uses: actions/download-artifact@v7
+        with:
+          name: node-image-1.35
+
+      - name: Load node image
+        if: needs.build-node-images.result == 'success'
+        run: sudo podman load -i node-image.tar
+
       - name: Setup bink
         uses: ./.github/actions/setup-bink
         with:
           cache-key-prefix: integration
+          # If the build of the image was skipped then we use the default one which needs to be pulled, otherwise we use
+          # the local one
+          node-image: ${{ needs.build-node-images.result == 'skipped' && 'ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk' || '' }}
 
       - name: Run integration tests
         run: sudo make test-integration TEST_PROCS=2
@@ -172,6 +188,9 @@ jobs:
           sudo podman volume prune -f 2>/dev/null || true
 
   integration-tests-composefs:
+    needs: [changes, build-node-images]
+    # Run when build-node-images is skipped (no node image changes) or succeeded, but not when it failed
+    if: ${{ !cancelled() && needs.build-node-images.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -179,10 +198,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Download composefs node image artifact
+        if: needs.build-node-images.result == 'success'
+        uses: actions/download-artifact@v7
+        with:
+          name: node-image-composefs-1.35
+
+      - name: Load composefs node image
+        if: needs.build-node-images.result == 'success'
+        run: sudo podman load -i node-image-composefs.tar
+
       - name: Setup bink
         uses: ./.github/actions/setup-bink
         with:
           cache-key-prefix: composefs
+          node-image: ${{ needs.build-node-images.result == 'skipped' && 'ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs' || '' }}
 
       - name: Run composefs integration tests
         run: sudo make test-integration-composefs
@@ -210,7 +240,9 @@ jobs:
           sudo podman volume prune -f 2>/dev/null || true
 
   integration-tests-k8s-versions:
-    needs: supported-versions
+    needs: [changes, supported-versions, build-node-images]
+    # Run when build-node-images is skipped (no node image changes) or succeeded, but not when it failed
+    if: ${{ !cancelled() && needs.build-node-images.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -225,10 +257,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Download node image artifact
+        if: needs.build-node-images.result == 'success'
+        uses: actions/download-artifact@v7
+        with:
+          name: node-image-${{ matrix.kube-minor }}
+
+      - name: Load node image
+        if: needs.build-node-images.result == 'success'
+        run: sudo podman load -i node-image.tar
+
       - name: Setup bink
         uses: ./.github/actions/setup-bink
         with:
           cache-key-prefix: k8s-${{ matrix.kube-minor }}
+          node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-44-disk', matrix.kube-minor) || '' }}
 
       - name: Run integration tests (K8s ${{ matrix.kube-minor }})
         run: sudo make test-integration GINKGO_FOCUS="should create and initialize a complete Kubernetes cluster"
