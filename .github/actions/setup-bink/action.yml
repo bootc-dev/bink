@@ -5,10 +5,19 @@ inputs:
   cache-key-prefix:
     description: Prefix for the image cache key
     required: true
+  node-image:
+    description: Node image to pull (omit if already loaded locally)
+    required: false
+    default: ''
 
 runs:
   using: composite
   steps:
+    - name: Add node image to pull list
+      if: inputs.node-image != ''
+      shell: bash
+      run: echo "BINK_IMAGES=$BINK_IMAGES ${{ inputs.node-image }}" >> "$GITHUB_ENV"
+
     - name: Configure kernel for nested containers
       shell: bash
       run: |
