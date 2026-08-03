@@ -55,16 +55,21 @@ jobs:
     outputs:
       all-versions: ${{ steps.set-matrix.outputs.all-versions }}
       non-default-versions: ${{ steps.set-matrix.outputs.non-default-versions }}
+      default-version: ${{ steps.set-matrix.outputs.default-version }}
+      fedora-version: ${{ steps.set-matrix.outputs.fedora-version }}
     steps:
       - name: Get supported Kubernetes versions
         id: set-matrix
         run: |
           DEFAULT="1.35"
+          FEDORA_VERSION="44"
           ALL=$(curl -s https://endoflife.date/api/kubernetes.json | \
             jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
           NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
           echo "all-versions=${ALL}" >> "$GITHUB_OUTPUT"
           echo "non-default-versions=${NON_DEFAULT}" >> "$GITHUB_OUTPUT"
+          echo "default-version=${DEFAULT}" >> "$GITHUB_OUTPUT"
+          echo "fedora-version=${FEDORA_VERSION}" >> "$GITHUB_OUTPUT"
 
   build-node-images:
     needs: [changes, supported-versions]
@@ -135,7 +140,7 @@ jobs:
           path: node-image-composefs.tar
 
   integration-tests:
-    needs: [changes, build-node-images]
+    needs: [changes, supported-versions, build-node-images]
     # Run when build-node-images is skipped (no node image changes) or succeeded, but not when it failed
     if: ${{ !cancelled() && needs.build-node-images.result != 'failure' }}
     runs-on: ubuntu-latest
@@ -149,7 +154,7 @@ jobs:
         if: needs.build-node-images.result == 'success'
         uses: actions/download-artifact@v7
         with:
-          name: node-image-1.35
+          name: node-image-${{ needs.supported-versions.outputs.default-version }}
 
       - name: Load node image
         if: needs.build-node-images.result == 'success'
@@ -159,9 +164,7 @@ jobs:
         uses: ./.github/actions/setup-bink
         with:
           cache-key-prefix: integration
-          # If the build of the image was skipped then we use the default one which needs to be pulled, otherwise we use
-          # the local one
-          node-image: ${{ needs.build-node-images.result == 'skipped' && 'ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk' || '' }}
+          node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-{1}-disk', needs.supported-versions.outputs.default-version, needs.supported-versions.outputs.fedora-version) || '' }}
 
       - name: Run integration tests
         run: sudo make test-integration TEST_PROCS=2
@@ -188,7 +191,7 @@ jobs:
           sudo podman volume prune -f 2>/dev/null || true
 
   integration-tests-composefs:
-    needs: [changes, build-node-images]
+    needs: [changes, supported-versions, build-node-images]
     # Run when build-node-images is skipped (no node image changes) or succeeded, but not when it failed
     if: ${{ !cancelled() && needs.build-node-images.result != 'failure' }}
     runs-on: ubuntu-latest
@@ -202,7 +205,7 @@ jobs:
         if: needs.build-node-images.result == 'success'
         uses: actions/download-artifact@v7
         with:
-          name: node-image-composefs-1.35
+          name: node-image-composefs-${{ needs.supported-versions.outputs.default-version }}
 
       - name: Load composefs node image
         if: needs.build-node-images.result == 'success'
@@ -212,14 +215,14 @@ jobs:
         uses: ./.github/actions/setup-bink
         with:
           cache-key-prefix: composefs
-          node-image: ${{ needs.build-node-images.result == 'skipped' && 'ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs' || '' }}
+          node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-{1}-disk-composefs', needs.supported-versions.outputs.default-version, needs.supported-versions.outputs.fedora-version) || '' }}
 
       - name: Run composefs integration tests
         run: sudo make test-integration-composefs
         timeout-minutes: 90
         env:
           CONTAINER_HOST: unix:///run/podman/podman.sock
-          BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs
+          BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ needs.supported-versions.outputs.default-version }}-fedora-${{ needs.supported-versions.outputs.fedora-version }}-disk-composefs
 
       - name: Collect logs
         if: failure()
@@ -251,7 +254,7 @@ jobs:
         kube-minor: ${{ fromJson(needs.supported-versions.outputs.non-default-versions) }}
 
     env:
-      BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-44-disk
+      BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ matrix.kube-minor }}-fedora-${{ needs.supported-versions.outputs.fedora-version }}-disk
 
     steps:
       - name: Checkout code
@@ -271,7 +274,7 @@ jobs:
         uses: ./.github/actions/setup-bink
         with:
           cache-key-prefix: k8s-${{ matrix.kube-minor }}
-          node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-44-disk', matrix.kube-minor) || '' }}
+          node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-{1}-disk', matrix.kube-minor, needs.supported-versions.outputs.fedora-version) || '' }}
 
       - name: Run integration tests (K8s ${{ matrix.kube-minor }})
         run: sudo make test-integration GINKGO_FOCUS="should create and initialize a complete Kubernetes cluster"
