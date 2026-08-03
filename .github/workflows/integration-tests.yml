@@ -300,3 +300,81 @@ jobs:
           sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
             xargs -r sudo podman rm -f 2>/dev/null || true
           sudo podman volume prune -f 2>/dev/null || true
+
+  push-node-images:
+    needs: [supported-versions, build-node-images, integration-tests, integration-tests-composefs, integration-tests-k8s-versions]
+    if: >-
+      needs.build-node-images.result == 'success' &&
+      (github.event_name == 'push' || inputs.push-node-images == true)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kube-minor: ${{ fromJson(needs.supported-versions.outputs.all-versions) }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download bootc image artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: bootc-image-${{ matrix.kube-minor }}
+
+      - name: Download disk image artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: node-image-${{ matrix.kube-minor }}
+
+      - name: Download composefs disk image artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: node-image-composefs-${{ matrix.kube-minor }}
+
+      - name: Load images
+        run: |
+          sudo podman load -i bootc-image.tar
+          sudo podman load -i node-image.tar
+          sudo podman load -i node-image-composefs.tar
+
+      - name: Determine image tag
+        id: meta
+        working-directory: node-images/fedora
+        run: |
+          TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+
+      - name: Push bootc image
+        working-directory: node-images/fedora
+        run: |
+          TAG=${{ steps.meta.outputs.tag }}
+          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+
+          sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
+          sudo podman push ${PUSH_DEST}:${TAG}
+
+      - name: Push disk image
+        working-directory: node-images/fedora
+        run: |
+          TAG=${{ steps.meta.outputs.tag }}
+          DISK_SRC=$(make -s print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+
+          sudo podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk
+          sudo podman push ${PUSH_DEST}:${TAG}-disk
+
+      - name: Push composefs disk image
+        working-directory: node-images/fedora
+        run: |
+          TAG=${{ steps.meta.outputs.tag }}
+          DISK_SRC=$(make -s print-node-image-composefs KUBE_MINOR=${{ matrix.kube-minor }})
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+
+          sudo podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk-composefs
+          sudo podman push ${PUSH_DEST}:${TAG}-disk-composefs
