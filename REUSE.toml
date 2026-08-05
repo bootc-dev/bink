@@ -73,3 +73,9 @@ path = "renovate.json"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The bink Authors"
 SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [".bootc-dev-infra-commit.txt", "gemini/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The bink Authors"
+SPDX-License-Identifier = "Apache-2.0"
