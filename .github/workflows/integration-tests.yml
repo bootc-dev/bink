@@ -358,6 +358,10 @@ jobs:
 
           sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
           sudo podman push ${PUSH_DEST}:${TAG}
+          if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
+            sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
+            sudo podman push ${PUSH_DEST}:latest
+          fi
 
       - name: Push disk image
         working-directory: node-images/fedora
@@ -368,6 +372,10 @@ jobs:
 
           sudo podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk
           sudo podman push ${PUSH_DEST}:${TAG}-disk
+          if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
+            sudo podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk
+            sudo podman push ${PUSH_DEST}:latest-disk
+          fi
 
       - name: Push composefs disk image
         working-directory: node-images/fedora
@@ -378,3 +386,7 @@ jobs:
 
           sudo podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk-composefs
           sudo podman push ${PUSH_DEST}:${TAG}-disk-composefs
+          if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
+            sudo podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk-composefs
+            sudo podman push ${PUSH_DEST}:latest-disk-composefs
+          fi
