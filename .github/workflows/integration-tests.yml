@@ -44,7 +44,7 @@ jobs:
 
       - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             node-images:
@@ -152,7 +152,7 @@ jobs:
 
       - name: Download node image artifact
         if: needs.build-node-images.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: node-image-${{ needs.supported-versions.outputs.default-version }}
 
@@ -203,7 +203,7 @@ jobs:
 
       - name: Download composefs node image artifact
         if: needs.build-node-images.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: node-image-composefs-${{ needs.supported-versions.outputs.default-version }}
 
@@ -262,7 +262,7 @@ jobs:
 
       - name: Download node image artifact
         if: needs.build-node-images.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: node-image-${{ matrix.kube-minor }}
 
@@ -319,17 +319,17 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Download bootc image artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: bootc-image-${{ matrix.kube-minor }}
 
       - name: Download disk image artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: node-image-${{ matrix.kube-minor }}
 
       - name: Download composefs disk image artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: node-image-composefs-${{ matrix.kube-minor }}
 
