@@ -31,5 +31,12 @@ df -h | sudo tee "$LOG_DIR/disk.txt" > /dev/null || true
 free -h | sudo tee "$LOG_DIR/memory.txt" > /dev/null || true
 sudo dmesg | tail -100 | sudo tee "$LOG_DIR/host-dmesg.txt" > /dev/null || true
 
+for bcvk_dir in /tmp/bcvk-logs*; do
+  [ -d "$bcvk_dir" ] || continue
+  dest="$LOG_DIR/$(basename "$bcvk_dir")"
+  mkdir -p "$dest"
+  cp -r "$bcvk_dir"/. "$dest"/ 2>/dev/null || true
+done
+
 echo "Logs collected in $LOG_DIR"
 ls -R "$LOG_DIR"

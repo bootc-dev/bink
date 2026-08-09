@@ -4,6 +4,7 @@ KUBE_MINOR ?= 1.35
 FEDORA_VERSION ?= 44
 DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G
+BUILD_LOG_DIR ?= /tmp/bcvk-logs
 BCVK_EXTRA_ARGS ?=
 
 IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
@@ -35,6 +36,11 @@ build-disk-image:
 	else \
 		BOOTC_DIGEST="$(BOOTC_DIGEST)"; \
 	fi && \
+	LOG_VOLUME="" && \
+	if [ -n "$(BUILD_LOG_DIR)" ]; then \
+		mkdir -p "$(BUILD_LOG_DIR)"; \
+		LOG_VOLUME="--volume $(BUILD_LOG_DIR):$(BUILD_LOG_DIR) --build-arg LOG_DIR=$(BUILD_LOG_DIR)"; \
+	fi && \
 	podman build \
 		--cap-add=SYS_ADMIN \
 		--cap-add=DAC_READ_SEARCH \
@@ -42,6 +48,7 @@ build-disk-image:
 		--security-opt=label=disable \
 		--device=/dev/kvm \
 		--volume "$$STORAGE_PATH:$$STORAGE_PATH" \
+		$$LOG_VOLUME \
 		--build-arg STORAGE_PATH="$$STORAGE_PATH" \
 		--build-arg FEDORA_VERSION="$(FEDORA_VERSION)" \
 		--build-arg BOOTC_IMAGE="$(BOOTC_IMAGE)" \
@@ -93,4 +100,5 @@ help:
 	@echo "  FEDORA_VERSION   - Fedora version (default: $(FEDORA_VERSION))"
 	@echo "  DISK_SIZE        - VM disk size (default: $(DISK_SIZE))"
 	@echo "  BUILD_MEMORY     - Memory for bcvk build (default: $(BUILD_MEMORY))"
+	@echo "  BUILD_LOG_DIR    - Host path to collect bcvk logs (default: none)"
 	@echo "  BCVK_EXTRA_ARGS  - Extra arguments passed to bcvk to-disk (default: none)"

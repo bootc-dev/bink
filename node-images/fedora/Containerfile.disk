@@ -9,9 +9,11 @@ ARG STORAGE_PATH
 ARG BOOTC_IMAGE
 ARG DISK_SIZE=10G
 ARG MEMORY=4G
+ARG LOG_DIR=/tmp/bcvk-logs
 ARG BCVK_EXTRA_ARGS=""
 ENV CONTAINERS_STORAGE_CONF=/tmp/storage.conf
-RUN mkdir -p /output && \
+ENV RUST_LOG=debug
+RUN mkdir -p /output ${LOG_DIR} && \
     printf "[storage]\ndriver = \"overlay\"\ngraphroot = \"${STORAGE_PATH}\"\n" > $CONTAINERS_STORAGE_CONF && \
     bcvk to-disk -K \
     --karg 'console=tty0' \
@@ -20,6 +22,7 @@ RUN mkdir -p /output && \
     --format qcow2 \
     --memory ${MEMORY} \
     --disk-size ${DISK_SIZE} \
+    --log-dir journal,console=${LOG_DIR} \
     ${BCVK_EXTRA_ARGS} \
     ${BOOTC_IMAGE} \
     /output/disk.qcow2
