@@ -46,6 +46,7 @@ build-disk-image:
 		--cap-add=DAC_READ_SEARCH \
 		--cap-add=MKNOD \
 		--security-opt=label=disable \
+		--ulimit nofile=65536:65536 \
 		--device=/dev/kvm \
 		--volume "$$STORAGE_PATH:$$STORAGE_PATH" \
 		$$LOG_VOLUME \
