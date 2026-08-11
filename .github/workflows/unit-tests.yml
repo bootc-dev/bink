@@ -25,6 +25,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Check gofmt
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "Go files need formatting:"
+            echo "$files"
+            exit 1
+          fi
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
