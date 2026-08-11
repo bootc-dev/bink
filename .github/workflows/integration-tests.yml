@@ -366,6 +366,7 @@ jobs:
         run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
       - name: Push bootc image
+        id: push-bootc
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
@@ -373,11 +374,28 @@ jobs:
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
           sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
-          sudo podman push ${PUSH_DEST}:${TAG}
+          sudo podman push --digestfile=/tmp/bootc-digest ${PUSH_DEST}:${TAG}
           if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
             sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
             sudo podman push ${PUSH_DEST}:latest
           fi
+
+          BOOTC_DIGEST=$(cat /tmp/bootc-digest)
+          echo "digest=${BOOTC_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Bootc registry digest: ${BOOTC_DIGEST}"
+
+      - name: Fix bootc digest label in disk images
+        run: |
+          BOOTC_DIGEST=${{ steps.push-bootc.outputs.digest }}
+          DISK_SRC=$(make -s -C node-images/fedora print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
+          DISK_COMPOSEFS_SRC=$(make -s -C node-images/fedora print-node-image-composefs KUBE_MINOR=${{ matrix.kube-minor }})
+
+          for IMG in "${DISK_SRC}" "${DISK_COMPOSEFS_SRC}"; do
+            CTR=$(sudo buildah from "${IMG}")
+            sudo buildah config --label "bink.bootc-image-digest=${BOOTC_DIGEST}" "${CTR}"
+            sudo buildah commit "${CTR}" "${IMG}"
+            sudo buildah rm "${CTR}"
+          done
 
       - name: Push disk image
         working-directory: node-images/fedora
