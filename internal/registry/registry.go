@@ -254,12 +254,11 @@ func (m *Manager) createAuthContainer(ctx context.Context) error {
 			},
 		},
 		Environment: map[string]string{
-			"REGISTRY_HTTP_ADDR":                            fmt.Sprintf("0.0.0.0:%d", config.AuthRegistryPort),
-			"REGISTRY_AUTH":                                 "htpasswd",
-			"REGISTRY_AUTH_HTPASSWD_REALM":                  "Registry Realm",
-			"REGISTRY_AUTH_HTPASSWD_PATH":                   "/auth/htpasswd",
-			"REGISTRY_HTTP_SECRET":                          config.RegistryHTTPSecret,
-			"REGISTRY_STORAGE_MAINTENANCE_READONLY_ENABLED": "true",
+			"REGISTRY_HTTP_ADDR":           fmt.Sprintf("0.0.0.0:%d", config.AuthRegistryPort),
+			"REGISTRY_AUTH":                "htpasswd",
+			"REGISTRY_AUTH_HTPASSWD_REALM": "Registry Realm",
+			"REGISTRY_AUTH_HTPASSWD_PATH":  "/auth/htpasswd",
+			"REGISTRY_HTTP_SECRET":         config.RegistryHTTPSecret,
 		},
 		Labels: map[string]string{
 			config.LabelComponent: "auth-registry",
