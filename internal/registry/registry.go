@@ -96,6 +96,9 @@ func (m *Manager) createContainer(ctx context.Context) error {
 				Options: []string{"z"},
 			},
 		},
+		Environment: map[string]string{
+			"REGISTRY_HTTP_SECRET": config.RegistryHTTPSecret,
+		},
 		Labels: map[string]string{
 			config.LabelComponent: "registry",
 		},

@@ -76,6 +76,7 @@ const (
 	RegistryStaticIP      = "10.88.0.2"
 	RegistryHostname      = "registry"
 	RegistryVolume        = "bink-registry-data"
+	RegistryHTTPSecret    = "bink-shared-secret"
 
 	HAProxyImage         = "docker.io/library/haproxy:lts-alpine"
 	HAProxyContainerName = "haproxy"
