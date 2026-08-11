@@ -85,6 +85,9 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 	if err := registryMgr.EnsureRegistry(ctx); err != nil {
 		return fmt.Errorf("ensuring registry: %w", err)
 	}
+	if err := registryMgr.EnsureAuthRegistry(ctx); err != nil {
+		return fmt.Errorf("ensuring auth registry: %w", err)
+	}
 	logger.Info("")
 
 	logger.Info("Step 3: Ensuring DNS container...")
@@ -196,6 +199,10 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 	logger.Info("Local registry:")
 	logger.Infof("  Push:  podman push --tls-verify=false localhost:%d/<image>:<tag>", config.RegistryPort)
 	logger.Infof("  Pull (in-cluster): %s.%s:%d/<image>:<tag>", config.RegistryHostname, config.ClusterDomain, config.RegistryPort)
+	logger.Info("")
+	logger.Info("Auth registry (pull with credentials):")
+	logger.Infof("  Pull (in-cluster): %s.%s:%d/<image>:<tag>", config.AuthRegistryHostname, config.ClusterDomain, config.AuthRegistryPort)
+	logger.Infof("  Credentials: %s / %s", config.AuthRegistryUsername, config.AuthRegistryPassword)
 	logger.Info("")
 
 	if exposePath != "" {

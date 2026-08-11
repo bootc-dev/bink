@@ -31,11 +31,28 @@ func newInfoCmd() *cobra.Command {
 				status = define.ContainerStateRunning.String()
 			}
 
-			fmt.Printf("Registry:  %s\n", status)
-			fmt.Printf("IP:        %s\n", info.IP)
-			fmt.Printf("Host port: %d\n", info.HostPort)
-			fmt.Printf("Push:      podman push --tls-verify=false %s/<image>:<tag>\n", info.PushURL)
-			fmt.Printf("Pull:      %s/<image>:<tag>\n", info.PullURL)
+			fmt.Printf("Registry (unauthenticated): %s\n", status)
+			fmt.Printf("  IP:        %s\n", info.IP)
+			fmt.Printf("  Host port: %d\n", info.HostPort)
+			fmt.Printf("  Push:      podman push --tls-verify=false %s/<image>:<tag>\n", info.PushURL)
+			fmt.Printf("  Pull:      %s/<image>:<tag>\n", info.PullURL)
+			fmt.Println()
+
+			authInfo, err := mgr.AuthRegistryInfo(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("getting auth registry info: %w", err)
+			}
+
+			authStatus := "stopped"
+			if authInfo.Running {
+				authStatus = define.ContainerStateRunning.String()
+			}
+
+			fmt.Printf("Registry (authenticated):   %s\n", authStatus)
+			fmt.Printf("  IP:          %s\n", authInfo.IP)
+			fmt.Printf("  Host port:   %d\n", authInfo.HostPort)
+			fmt.Printf("  Pull:        %s/<image>:<tag>\n", authInfo.PullURL)
+			fmt.Printf("  Credentials: %s / %s\n", authInfo.Username, authInfo.Password)
 
 			return nil
 		},
