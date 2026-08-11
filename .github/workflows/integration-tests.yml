@@ -49,6 +49,7 @@ jobs:
           filters: |
             node-images:
               - 'node-images/fedora/**'
+              - '.github/workflows/integration-tests.yml'
 
   supported-versions:
     runs-on: ubuntu-latest
