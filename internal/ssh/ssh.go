@@ -27,11 +27,11 @@ type Client struct {
 
 // Config holds SSH client configuration
 type Config struct {
-	ContainerName string         // Podman container name
-	Host          string         // SSH host (usually "localhost" for port-forwarded VMs)
-	Port          string         // SSH port (usually "2222" for port-forwarded VMs)
-	KeyPath       string         // Path to SSH private key
-	User          string         // SSH user (usually "core")
+	ContainerName string // Podman container name
+	Host          string // SSH host (usually "localhost" for port-forwarded VMs)
+	Port          string // SSH port (usually "2222" for port-forwarded VMs)
+	KeyPath       string // Path to SSH private key
+	User          string // SSH user (usually "core")
 	Logger        *logrus.Logger
 	PodmanClient  *podman.Client // Podman client for container operations
 }

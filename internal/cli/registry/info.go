@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	registrypkg "github.com/bootc-dev/bink/internal/registry"
-	"go.podman.io/podman/v6/libpod/define"
 	"github.com/spf13/cobra"
+	"go.podman.io/podman/v6/libpod/define"
 )
 
 func newInfoCmd() *cobra.Command {

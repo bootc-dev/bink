@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"go.podman.io/podman/v6/pkg/specgen"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.podman.io/podman/v6/pkg/specgen"
 
 	"github.com/bootc-dev/bink/internal/cluster"
 	"github.com/bootc-dev/bink/internal/config"

@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/bootc-dev/bink/internal/config"
+	"github.com/sirupsen/logrus"
+	nettypes "go.podman.io/common/libnetwork/types"
 	"go.podman.io/podman/v6/pkg/api/handlers"
 	"go.podman.io/podman/v6/pkg/bindings"
 	"go.podman.io/podman/v6/pkg/bindings/containers"
@@ -22,8 +24,6 @@ import (
 	"go.podman.io/podman/v6/pkg/bindings/volumes"
 	"go.podman.io/podman/v6/pkg/domain/entities"
 	"go.podman.io/podman/v6/pkg/specgen"
-	"github.com/sirupsen/logrus"
-	nettypes "go.podman.io/common/libnetwork/types"
 )
 
 type Client struct {

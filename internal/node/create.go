@@ -11,10 +11,10 @@ import (
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
 	"github.com/bootc-dev/bink/internal/virsh"
-	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	nettypes "go.podman.io/common/libnetwork/types"
+	"go.podman.io/podman/v6/pkg/specgen"
 )
 
 func (n *Node) createContainer(ctx context.Context) error {
@@ -222,7 +222,7 @@ func (n *Node) createVM(ctx context.Context) error {
 		Memory:    n.Memory,
 		MaxMemory: maxMemory,
 		VCPUs:     n.VCPUs,
-		Disks:  []string{overlayDisk, isoPath},
+		Disks:     []string{overlayDisk, isoPath},
 		Networks: []virsh.NetworkConfig{
 			{
 				Type:        "passt",

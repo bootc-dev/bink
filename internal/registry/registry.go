@@ -11,10 +11,10 @@ import (
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
-	"go.podman.io/podman/v6/libpod/define"
-	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/sirupsen/logrus"
 	nettypes "go.podman.io/common/libnetwork/types"
+	"go.podman.io/podman/v6/libpod/define"
+	"go.podman.io/podman/v6/pkg/specgen"
 )
 
 type Manager struct {
@@ -141,11 +141,11 @@ func (m *Manager) StopRegistry(ctx context.Context) error {
 }
 
 type RegistryStatus struct {
-	Running   bool
-	IP        string
-	HostPort  int
-	PushURL   string
-	PullURL   string
+	Running  bool
+	IP       string
+	HostPort int
+	PushURL  string
+	PullURL  string
 }
 
 func (m *Manager) RegistryInfo(ctx context.Context) (*RegistryStatus, error) {

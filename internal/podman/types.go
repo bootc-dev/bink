@@ -4,9 +4,9 @@
 package podman
 
 import (
-	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	nettypes "go.podman.io/common/libnetwork/types"
+	"go.podman.io/podman/v6/pkg/specgen"
 )
 
 type ContainerCreateOptions struct {

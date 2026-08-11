@@ -12,9 +12,9 @@ import (
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
-	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+	"go.podman.io/podman/v6/pkg/specgen"
 )
 
 var (
@@ -190,7 +190,7 @@ func (c *Cluster) populateImagesVolume(ctx context.Context, volumeName, nodeImag
 			Source:      nodeImage,
 			Destination: "/images",
 		}},
-		Volumes: []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
+		Volumes:     []*specgen.NamedVolume{{Name: volumeName, Dest: "/var/lib/containers/storage"}},
 		CapAdd:      []string{"SYS_ADMIN"},
 		Devices:     []specs.LinuxDevice{{Path: "/dev/fuse"}},
 		SelinuxOpts: []string{"disable"},

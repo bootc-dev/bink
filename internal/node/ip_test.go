@@ -37,7 +37,6 @@ func TestCalculateClusterIP(t *testing.T) {
 	}
 }
 
-
 func TestCalculateClusterIP_Deterministic(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		ip1 := CalculateClusterIP("podman", "node1")

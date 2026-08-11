@@ -23,9 +23,9 @@ func newRemoveCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "remove <node-name>",
-		Short: "Remove a node from the cluster",
-		Long:  "Drain and remove a node from the Kubernetes cluster, then stop and remove its container",
+		Use:               "remove <node-name>",
+		Short:             "Remove a node from the cluster",
+		Long:              "Drain and remove a node from the Kubernetes cluster, then stop and remove its container",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cli.CompleteNodeNames,
 		RunE: func(cmd *cobra.Command, args []string) error {

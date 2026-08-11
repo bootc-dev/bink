@@ -72,7 +72,7 @@ Common workflows:
 		}
 
 		logrus.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp: false,
+			FullTimestamp:    false,
 			DisableTimestamp: true,
 		})
 	},

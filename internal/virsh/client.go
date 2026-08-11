@@ -132,4 +132,3 @@ func (c *Client) Genisoimage(ctx context.Context, outputPath, volumeID string, f
 
 	return c.podmanClient.ContainerExecQuiet(ctx, c.containerName, args)
 }
-

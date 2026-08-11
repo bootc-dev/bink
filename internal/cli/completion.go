@@ -69,5 +69,3 @@ func CompleteNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	}
 	return names, cobra.ShellCompDirectiveNoFileComp
 }
-
-

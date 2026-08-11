@@ -41,15 +41,15 @@ func TestExtractVersionFromTag(t *testing.T) {
 }
 
 type mockPodmanClient struct {
-	imageLabels      map[string]string
-	imageInspectErr  error
-	volumeExistsVal  bool
-	volumeExistsErr  error
-	volumeCreateErr  error
-	containerCreated bool
-	containerCreateErr error
-	containerExecOut string
-	containerExecErr error
+	imageLabels           map[string]string
+	imageInspectErr       error
+	volumeExistsVal       bool
+	volumeExistsErr       error
+	volumeCreateErr       error
+	containerCreated      bool
+	containerCreateErr    error
+	containerExecOut      string
+	containerExecErr      error
 	containerExecQuietErr error
 	containerRunQuietErr  error
 	containerExistsVal    bool
@@ -203,7 +203,7 @@ func TestEnsureImagesVolume(t *testing.T) {
 
 	t.Run("volume exists and completed", func(t *testing.T) {
 		mock := &mockPodmanClient{
-			imageLabels:    map[string]string{"bink.kubeadm-version": "1.35"},
+			imageLabels:     map[string]string{"bink.kubeadm-version": "1.35"},
 			volumeExistsVal: true,
 		}
 		c := New(Config{Name: "test", PodmanClient: mock})

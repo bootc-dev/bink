@@ -14,9 +14,9 @@ import (
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/internal/podman"
-	"go.podman.io/podman/v6/libpod/define"
 	"github.com/sirupsen/logrus"
 	nettypes "go.podman.io/common/libnetwork/types"
+	"go.podman.io/podman/v6/libpod/define"
 )
 
 var configTemplate = template.Must(template.New("haproxy.cfg").Parse(`global
