@@ -1,7 +1,16 @@
 ARG FEDORA_VERSION=44
+ARG BCVK_REF=main
+
+FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION} AS bcvk-builder
+ARG BCVK_REF
+RUN dnf install -y --setopt=install_weak_deps=0 git rust cargo && dnf clean all
+RUN git clone https://github.com/bootc-dev/bcvk.git /bcvk && \
+    git -C /bcvk checkout ${BCVK_REF} && \
+    cargo build --release --manifest-path /bcvk/Cargo.toml
 
 FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION} AS builder
-RUN dnf install -y --setopt=install_weak_deps=0 qemu-kvm podman bcvk binutils && dnf clean all
+RUN dnf install -y --setopt=install_weak_deps=0 qemu-kvm qemu-img podman binutils && dnf clean all
+COPY --from=bcvk-builder /bcvk/target/release/bcvk /usr/local/bin/bcvk
 RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_manager="cgroupfs"\n' \
     > /etc/containers/containers.conf
 

@@ -6,6 +6,7 @@ DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G
 BUILD_LOG_DIR ?= /tmp/bcvk-logs
 BCVK_EXTRA_ARGS ?=
+BCVK_REF ?= 9005a6111f62533cb7b8b6a3cdffe6e1e98ce673
 
 IMAGE_TAG ?= v$(KUBE_MINOR)-fedora-$(FEDORA_VERSION)
 REGISTRY ?= ghcr.io/bootc-dev/bink
@@ -58,6 +59,7 @@ build-disk-image:
 		--build-arg KUBE_MINOR="$(KUBE_MINOR)" \
 		--build-arg BOOTC_DIGEST="$$BOOTC_DIGEST" \
 		--build-arg BCVK_EXTRA_ARGS="$(BCVK_EXTRA_ARGS)" \
+		--build-arg BCVK_REF="$(BCVK_REF)" \
 		-t $(NODE_IMAGE) \
 		-f Containerfile.disk \
 		.
@@ -103,3 +105,4 @@ help:
 	@echo "  BUILD_MEMORY     - Memory for bcvk build (default: $(BUILD_MEMORY))"
 	@echo "  BUILD_LOG_DIR    - Host path to collect bcvk logs (default: none)"
 	@echo "  BCVK_EXTRA_ARGS  - Extra arguments passed to bcvk to-disk (default: none)"
+	@echo "  BCVK_REF         - Git commit/tag to build bcvk from source (default: $(BCVK_REF))"
