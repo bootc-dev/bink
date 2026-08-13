@@ -107,7 +107,7 @@ func (m *Manager) createContainer(ctx context.Context) error {
 
 	_, err := m.podman.ContainerCreate(ctx, opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "already in use") {
+		if isContainerAlreadyExists(err) {
 			logrus.Info("Registry container was created concurrently")
 			return nil
 		}
@@ -133,7 +133,10 @@ func (m *Manager) StopRegistry(ctx context.Context) error {
 	}
 
 	if err := m.podman.ContainerRemove(ctx, config.RegistryContainerName, true); err != nil {
-		return fmt.Errorf("removing registry container: %w", err)
+		if !isContainerGone(err) {
+			return fmt.Errorf("removing registry container: %w", err)
+		}
+		logrus.Debug("Registry container already removed")
 	}
 
 	if err := m.podman.VolumeRemove(ctx, config.RegistryVolume); err != nil {
@@ -267,7 +270,7 @@ func (m *Manager) createAuthContainer(ctx context.Context) error {
 
 	_, err = m.podman.ContainerCreate(ctx, opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "already in use") {
+		if isContainerAlreadyExists(err) {
 			logrus.Info("Auth registry container was created concurrently")
 			return nil
 		}
@@ -293,7 +296,10 @@ func (m *Manager) StopAuthRegistry(ctx context.Context) error {
 	}
 
 	if err := m.podman.ContainerRemove(ctx, config.AuthRegistryContainerName, true); err != nil {
-		return fmt.Errorf("removing auth registry container: %w", err)
+		if !isContainerGone(err) {
+			return fmt.Errorf("removing auth registry container: %w", err)
+		}
+		logrus.Debug("Auth registry container already removed")
 	}
 
 	logrus.Info("Auth registry stopped and removed")
@@ -334,6 +340,16 @@ func (m *Manager) AuthRegistryInfo(ctx context.Context) (*AuthRegistryStatus, er
 
 	info.Running = status == define.ContainerStateRunning.String()
 	return info, nil
+}
+
+func isContainerGone(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, define.ErrNoSuchCtr.Error()) || strings.Contains(msg, "not found")
+}
+
+func isContainerAlreadyExists(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, define.ErrCtrExists.Error()) || strings.Contains(msg, "already in use")
 }
 
 func generateHtpasswd(username, password string) (string, error) {
