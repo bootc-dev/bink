@@ -27,6 +27,7 @@ RUN mkdir -p /output ${LOG_DIR} && \
     bcvk to-disk -K \
     --karg 'console=tty0' \
     --karg 'console=ttyS0,115200n8' \
+    --karg 'console=hvc0' \
     --filesystem ext4 \
     --format qcow2 \
     --memory ${MEMORY} \
