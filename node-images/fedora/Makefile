@@ -1,4 +1,4 @@
-.PHONY: build-bootc-image build-disk-image build-disk-image-composefs clean help
+.PHONY: build-bootc-image build-disk-image build-disk-image-composefs print-kube-minor clean help
 
 KUBE_MINOR ?= 1.36
 FEDORA_VERSION ?= 45
@@ -82,6 +82,9 @@ print-node-image:
 
 print-node-image-composefs:
 	@echo $(NODE_IMAGE_COMPOSEFS)
+
+print-kube-minor:
+	@echo $(KUBE_MINOR)
 
 clean:
 	@echo "=== Cleaning up ==="
