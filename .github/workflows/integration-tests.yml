@@ -62,7 +62,7 @@ jobs:
       - name: Get supported Kubernetes versions
         id: set-matrix
         run: |
-          DEFAULT="1.35"
+          DEFAULT=$(make -s -C node-images/fedora print-kube-minor)
           FEDORA_VERSION="44"
           ALL=$(curl -s https://endoflife.date/api/kubernetes.json | \
             jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
