@@ -21,7 +21,10 @@ runs:
     - name: Configure kernel for nested containers
       shell: bash
       run: |
+        sudo systemctl disable --now apparmor 2>/dev/null || true
         sudo aa-teardown 2>/dev/null || true
+        echo "AppArmor status after teardown:"
+        sudo aa-status 2>/dev/null || echo "(aa-status failed)"
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
         sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
         sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
@@ -49,6 +52,8 @@ runs:
           libbtrfs-dev \
           libdevmapper-dev \
           pkg-config
+        # passt's postinst reloads its AppArmor profile in enforce mode; remove it
+        sudo aa-teardown 2>/dev/null || true
 
     - name: Set up KVM
       shell: bash
@@ -80,7 +85,6 @@ runs:
       run: |
         make build-cluster-image
         make build-dns-image
-
 
     - name: Verify prerequisites
       shell: bash
