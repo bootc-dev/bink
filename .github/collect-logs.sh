@@ -2,6 +2,8 @@
 # Collect logs from bink test containers for CI debugging
 # Writes per-container log files to $LOG_DIR (default: /tmp/bink-logs)
 
+set -x
+
 LOG_DIR="${LOG_DIR:-/tmp/bink-logs}"
 mkdir -p "$LOG_DIR"
 
@@ -9,17 +11,17 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o Connect
 
 ssh_vm() {
   local ctr="$1" cmd="$2"
-  sudo podman exec "$ctr" ssh $SSH_OPTS core@localhost "$cmd" 2>&1
+  podman exec "$ctr" ssh $SSH_OPTS core@localhost "$cmd" 2>&1
 }
 
-sudo podman ps -a 2>/dev/null > "$LOG_DIR/podman-ps.txt" || true
+podman ps -a 2>/dev/null > "$LOG_DIR/podman-ps.txt" || true
 
-for ctr in $(sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' 2>/dev/null); do
+for ctr in $(podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' 2>/dev/null); do
   echo "Collecting logs for $ctr"
   dir="$LOG_DIR/$ctr"
   mkdir -p "$dir"
 
-  sudo podman logs "$ctr" > "$dir/container.log" 2>&1 || true
+  podman logs "$ctr" > "$dir/container.log" 2>&1 || true
   ssh_vm "$ctr" "sudo journalctl -n 200 --no-pager" > "$dir/journal.log" || echo "(VM not reachable)" > "$dir/journal.log"
   ssh_vm "$ctr" "sudo journalctl -u kubelet -n 100 --no-pager" > "$dir/kubelet.log" || true
   ssh_vm "$ctr" "sudo journalctl -u crio -n 100 --no-pager" > "$dir/crio.log" || true
@@ -27,9 +29,11 @@ for ctr in $(sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}
   ssh_vm "$ctr" "sudo dmesg" > "$dir/dmesg.log" || true
 done
 
-df -h | sudo tee "$LOG_DIR/disk.txt" > /dev/null || true
-free -h | sudo tee "$LOG_DIR/memory.txt" > /dev/null || true
-sudo dmesg | tail -100 | sudo tee "$LOG_DIR/host-dmesg.txt" > /dev/null || true
+df -h > "$LOG_DIR/disk.txt" 2>&1 || true
+free -h > "$LOG_DIR/memory.txt" 2>&1 || true
+sudo dmesg > "$LOG_DIR/host-dmesg.txt" 2>&1 || true
+sudo journalctl --no-pager > "$LOG_DIR/host-journal.log" 2>&1 || true
+sudo cp /var/log/audit/audit.log "$LOG_DIR/audit.log" 2>/dev/null || true
 
 for bcvk_dir in /tmp/bcvk-logs*; do
   [ -d "$bcvk_dir" ] || continue
