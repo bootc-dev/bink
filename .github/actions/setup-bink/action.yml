@@ -60,24 +60,33 @@ runs:
       shell: bash
       run: |
         podman --version
-        sudo mkdir -p /etc/containers
-        echo '{"defaultAction":"SCMP_ACT_ALLOW"}' | sudo tee /etc/containers/seccomp.json
-        printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "/etc/containers/seccomp.json"\n' | sudo tee /etc/containers/containers.conf
-        grep -q '^root:' /etc/subuid || echo 'root:100000:65536' | sudo tee -a /etc/subuid
-        grep -q '^root:' /etc/subgid || echo 'root:100000:65536' | sudo tee -a /etc/subgid
-        printf 'unqualified-search-registries = ["docker.io"]\n' | sudo tee /etc/containers/registries.conf
-        sudo systemctl start podman.socket
-        sudo podman info --format '{{.Store.GraphRoot}}'
+        mkdir -p ~/.config/containers
+        echo '{"defaultAction":"SCMP_ACT_ALLOW"}' > ~/.config/containers/seccomp.json
+        printf '[containers]\napparmor_profile = "unconfined"\nseccomp_profile = "%s/.config/containers/seccomp.json"\n' "$HOME" > ~/.config/containers/containers.conf
+        USER_NAME=$(id -un)
+        grep -q "^${USER_NAME}:" /etc/subuid || echo "${USER_NAME}:100000:65536" | sudo tee -a /etc/subuid
+        grep -q "^${USER_NAME}:" /etc/subgid || echo "${USER_NAME}:100000:65536" | sudo tee -a /etc/subgid
+        printf 'unqualified-search-registries = ["docker.io"]\n' > ~/.config/containers/registries.conf
+        systemctl --user enable --now podman.socket
+        echo "CONTAINER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> "$GITHUB_ENV"
+        podman info --format '{{.Store.GraphRoot}}'
 
     - name: Build bink binary
       shell: bash
-      run: sudo make build-bink
+      run: make build-bink
+
+    - name: Build cluster and DNS images
+      shell: bash
+      run: |
+        make build-cluster-image
+        make build-dns-image
+
 
     - name: Verify prerequisites
       shell: bash
       run: |
         test -f ./bink
-        sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+        podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
         df -h /
         free -h
 
@@ -105,9 +114,9 @@ runs:
       shell: bash
       run: |
         for f in /tmp/podman-image-cache/*.tar; do
-          sudo podman load -i "$f"
+          podman load -i "$f"
         done
-        sudo podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+        podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
 
     - name: Pre-pull container images
       if: steps.image-cache.outputs.cache-hit != 'true'
@@ -115,11 +124,10 @@ runs:
       run: |
         mkdir -p /tmp/podman-image-cache
         for img in $BINK_IMAGES $EXTERNAL_IMAGES; do
-          sudo podman pull "$img"
+          podman pull "$img"
           name=$(echo "$img" | sed 's|[/:]|_|g')
-          sudo podman save -o "/tmp/podman-image-cache/${name}.tar" "$img"
+          podman save -o "/tmp/podman-image-cache/${name}.tar" "$img"
         done
-        sudo chown -R $(id -u):$(id -g) /tmp/podman-image-cache
 
     - name: Save image cache
       if: steps.image-cache.outputs.cache-hit != 'true'

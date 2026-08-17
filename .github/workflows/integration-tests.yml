@@ -175,7 +175,7 @@ jobs:
 
       - name: Load node image
         if: needs.build-node-images.result == 'success'
-        run: sudo podman load -i node-image.tar
+        run: podman load -i node-image.tar
 
       - name: Setup bink
         uses: ./.github/actions/setup-bink
@@ -184,10 +184,8 @@ jobs:
           node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-{1}-disk', needs.supported-versions.outputs.default-version, needs.supported-versions.outputs.fedora-version) || '' }}
 
       - name: Run integration tests
-        run: sudo make test-integration TEST_PROCS=2
+        run: make test-integration TEST_PROCS=2
         timeout-minutes: 90
-        env:
-          CONTAINER_HOST: unix:///run/podman/podman.sock
 
       - name: Collect logs
         if: failure()
@@ -203,9 +201,9 @@ jobs:
       - name: Cleanup test clusters
         if: always()
         run: |
-          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
-            xargs -r sudo podman rm -f 2>/dev/null || true
-          sudo podman volume prune -f 2>/dev/null || true
+          podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r podman rm -f 2>/dev/null || true
+          podman volume prune -f 2>/dev/null || true
 
   integration-tests-composefs:
     needs: [changes, supported-versions, build-node-images]
@@ -226,7 +224,7 @@ jobs:
 
       - name: Load composefs node image
         if: needs.build-node-images.result == 'success'
-        run: sudo podman load -i node-image-composefs.tar
+        run: podman load -i node-image-composefs.tar
 
       - name: Setup bink
         uses: ./.github/actions/setup-bink
@@ -235,10 +233,9 @@ jobs:
           node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-{1}-disk-composefs', needs.supported-versions.outputs.default-version, needs.supported-versions.outputs.fedora-version) || '' }}
 
       - name: Run composefs integration tests
-        run: sudo make test-integration-composefs
+        run: make test-integration-composefs
         timeout-minutes: 90
         env:
-          CONTAINER_HOST: unix:///run/podman/podman.sock
           BINK_NODE_IMAGE: ghcr.io/bootc-dev/bink/node:v${{ needs.supported-versions.outputs.default-version }}-fedora-${{ needs.supported-versions.outputs.fedora-version }}-disk-composefs
 
       - name: Collect logs
@@ -255,9 +252,9 @@ jobs:
       - name: Cleanup test clusters
         if: always()
         run: |
-          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
-            xargs -r sudo podman rm -f 2>/dev/null || true
-          sudo podman volume prune -f 2>/dev/null || true
+          podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r podman rm -f 2>/dev/null || true
+          podman volume prune -f 2>/dev/null || true
 
   integration-tests-k8s-versions:
     needs: [changes, supported-versions, build-node-images]
@@ -285,7 +282,7 @@ jobs:
 
       - name: Load node image
         if: needs.build-node-images.result == 'success'
-        run: sudo podman load -i node-image.tar
+        run: podman load -i node-image.tar
 
       - name: Setup bink
         uses: ./.github/actions/setup-bink
@@ -294,10 +291,9 @@ jobs:
           node-image: ${{ needs.build-node-images.result == 'skipped' && format('ghcr.io/bootc-dev/bink/node:v{0}-fedora-{1}-disk', matrix.kube-minor, needs.supported-versions.outputs.fedora-version) || '' }}
 
       - name: Run integration tests (K8s ${{ matrix.kube-minor }})
-        run: sudo make test-integration GINKGO_FOCUS="should create and initialize a complete Kubernetes cluster"
+        run: make test-integration GINKGO_FOCUS="should create and initialize a complete Kubernetes cluster"
         timeout-minutes: 90
         env:
-          CONTAINER_HOST: unix:///run/podman/podman.sock
           BINK_NODE_IMAGE: ${{ env.BINK_NODE_IMAGE }}
 
       - name: Collect logs
@@ -314,9 +310,9 @@ jobs:
       - name: Cleanup test clusters
         if: always()
         run: |
-          sudo podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
-            xargs -r sudo podman rm -f 2>/dev/null || true
-          sudo podman volume prune -f 2>/dev/null || true
+          podman ps -a --filter "name=k8s-test-bink" --format '{{.Names}}' | \
+            xargs -r podman rm -f 2>/dev/null || true
+          podman volume prune -f 2>/dev/null || true
 
   push-node-images:
     needs: [supported-versions, build-node-images, integration-tests, integration-tests-composefs, integration-tests-k8s-versions]
