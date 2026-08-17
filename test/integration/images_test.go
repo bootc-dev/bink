@@ -12,6 +12,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"go.podman.io/podman/v6/pkg/specgen"
 
 	"github.com/bootc-dev/bink/internal/cluster"
@@ -125,6 +126,9 @@ var _ = Describe("Cluster Images Volume", Serial, func() {
 				Name: volumeName,
 				Dest: "/var/lib/containers/storage",
 			}},
+			CapAdd:      []string{"SYS_ADMIN"},
+			Devices:     []specs.LinuxDevice{{Path: "/dev/fuse"}},
+			SelinuxOpts: []string{"disable"},
 		})
 		Expect(err).ToNot(HaveOccurred())
 
