@@ -3,8 +3,11 @@ ARG BCVK_REF=main
 
 FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION} AS bcvk-builder
 ARG BCVK_REF
-RUN dnf install -y --setopt=install_weak_deps=0 git rust cargo && dnf clean all
-RUN git clone https://github.com/bootc-dev/bcvk.git /bcvk && \
+RUN dnf install -y --setopt=install_weak_deps=0 git rust cargo openssl-devel pkg-config && dnf clean all
+# TODO: currently, there is a bug in bcvk where the digest for the image
+# doesn't match with the remote digest. A temporary fix is available at this
+# repository. See: https://github.com/bootc-dev/bcvk/pull/314
+RUN git clone https://github.com/Johan-Liebert1/bcvk.git /bcvk && \
     git -C /bcvk checkout ${BCVK_REF} && \
     cargo build --release --manifest-path /bcvk/Cargo.toml
 
