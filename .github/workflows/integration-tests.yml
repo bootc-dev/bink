@@ -58,6 +58,7 @@ jobs:
       non-default-versions: ${{ steps.set-matrix.outputs.non-default-versions }}
       default-version: ${{ steps.set-matrix.outputs.default-version }}
       fedora-version: ${{ steps.set-matrix.outputs.fedora-version }}
+      branch-tag: ${{ steps.set-matrix.outputs.branch-tag }}
     steps:
       - name: Get supported Kubernetes versions
         id: set-matrix
@@ -67,10 +68,12 @@ jobs:
           ALL=$(curl -s https://endoflife.date/api/kubernetes.json | \
             jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
           NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
+          BRANCH_TAG=$(echo "${{ github.head_ref || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g')
           echo "all-versions=${ALL}" >> "$GITHUB_OUTPUT"
           echo "non-default-versions=${NON_DEFAULT}" >> "$GITHUB_OUTPUT"
           echo "default-version=${DEFAULT}" >> "$GITHUB_OUTPUT"
           echo "fedora-version=${FEDORA_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "branch-tag=${BRANCH_TAG}" >> "$GITHUB_OUTPUT"
 
   build-node-images:
     needs: [changes, supported-versions]
@@ -80,6 +83,9 @@ jobs:
       fail-fast: false
       matrix:
         kube-minor: ${{ fromJson(needs.supported-versions.outputs.all-versions) }}
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -101,9 +107,15 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
+          STAGING_TAG=${{ needs.supported-versions.outputs.branch-tag }}-${TAG}
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Image tag: ${TAG}"
+          echo "staging-tag=${STAGING_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${TAG} (staging: ${STAGING_TAG})"
 
+      # Podman reports a different digest for a freshly-built local image than the
+      # one bcvk will see once it's distributed via a real registry. Round-tripping
+      # through a registry normalizes it. This must not depend on GHCR credentials:
+      # it always runs, including for fork PRs, which never get a writable token.
       - name: Push bootc image to local registry
         working-directory: node-images/fedora
         run: |
@@ -120,17 +132,21 @@ jobs:
           sudo podman tag localhost:5000/node:${{ steps.meta.outputs.tag }} ${BOOTC_SRC}
           echo "Bootc image digest: $(sudo podman inspect --format '{{.Digest}}' ${BOOTC_SRC})"
 
-      - name: Save bootc image
+      # Only stage to GHCR when push-node-images will actually run afterward: that's
+      # the sole consumer, and it only runs on push/workflow_dispatch, which are the
+      # only contexts guaranteed to have a writable GITHUB_TOKEN.
+      - name: Log in to GHCR
+        if: github.event_name == 'push' || inputs.push-node-images == true
+        run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+
+      - name: Push bootc image to GHCR (staging)
+        if: github.event_name == 'push' || inputs.push-node-images == true
         working-directory: node-images/fedora
         run: |
           BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
-          sudo podman save -o ${{ github.workspace }}/bootc-image.tar ${BOOTC_SRC}
-
-      - name: Upload bootc image artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: bootc-image-${{ matrix.kube-minor }}
-          path: bootc-image.tar
+          PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
+          sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:${{ steps.meta.outputs.staging-tag }}
+          sudo podman push ${PUSH_DEST}:${{ steps.meta.outputs.staging-tag }}
 
       - name: Build disk image
         working-directory: node-images/fedora
@@ -357,11 +373,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Download bootc image artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: bootc-image-${{ matrix.kube-minor }}
-
       - name: Download disk image artifact
         uses: actions/download-artifact@v8
         with:
@@ -374,7 +385,6 @@ jobs:
 
       - name: Load images
         run: |
-          sudo podman load -i bootc-image.tar
           sudo podman load -i node-image.tar
           sudo podman load -i node-image-composefs.tar
 
@@ -383,7 +393,9 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
+          STAGING_TAG=${{ needs.supported-versions.outputs.branch-tag }}-${TAG}
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "staging-tag=${STAGING_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
@@ -392,14 +404,12 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
+          STAGING_TAG=${{ steps.meta.outputs.staging-tag }}
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
-          sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
-          sudo podman push ${PUSH_DEST}:${TAG}
+          sudo skopeo copy docker://${PUSH_DEST}:${STAGING_TAG} docker://${PUSH_DEST}:${TAG}
           if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
-            sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
-            sudo podman push ${PUSH_DEST}:latest
+            sudo skopeo copy docker://${PUSH_DEST}:${STAGING_TAG} docker://${PUSH_DEST}:latest
           fi
 
       - name: Push disk image
@@ -429,3 +439,44 @@ jobs:
             sudo podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk-composefs
             sudo podman push ${PUSH_DEST}:latest-disk-composefs
           fi
+
+  cleanup-staged-images:
+    needs:
+      [
+        supported-versions,
+        build-node-images,
+        integration-tests,
+        integration-tests-composefs,
+        integration-tests-k8s-versions,
+        push-node-images,
+      ]
+    # Only staged (push/workflow_dispatch) runs push anything to GHCR in the first
+    # place. Always run once every consumer has finished, regardless of whether
+    # they succeeded, failed, or were skipped.
+    if: always() && needs.build-node-images.result != 'skipped' && (github.event_name == 'push' || inputs.push-node-images == true)
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete staged bootc images from GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER=$(echo "${{ env.PUSH_REGISTRY }}" | cut -d'/' -f2)
+          PACKAGE="$(echo "${{ env.PUSH_REGISTRY }}" | cut -d'/' -f3)/${{ env.PUSH_IMAGE }}"
+          PACKAGE_ENC="${PACKAGE//\//%2F}"
+          BRANCH_TAG=${{ needs.supported-versions.outputs.branch-tag }}
+
+          for kube_minor in $(echo '${{ needs.supported-versions.outputs.all-versions }}' | jq -r '.[]'); do
+            TAG="v${kube_minor}-fedora-${{ needs.supported-versions.outputs.fedora-version }}"
+            STAGING_TAG="${BRANCH_TAG}-${TAG}"
+            echo "Looking up staged image tag: ${STAGING_TAG}"
+            VERSION_ID=$(gh api "/orgs/${OWNER}/packages/container/${PACKAGE_ENC}/versions" --paginate \
+              --jq ".[] | select(.metadata.container.tags[]? == \"${STAGING_TAG}\") | .id" | head -n1)
+            if [ -n "$VERSION_ID" ]; then
+              gh api --method DELETE "/orgs/${OWNER}/packages/container/${PACKAGE_ENC}/versions/${VERSION_ID}"
+              echo "Deleted staged image version ${VERSION_ID} (${STAGING_TAG})"
+            else
+              echo "No staged image found for ${STAGING_TAG}, skipping"
+            fi
+          done
