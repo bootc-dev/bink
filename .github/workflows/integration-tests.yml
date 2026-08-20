@@ -124,7 +124,7 @@ jobs:
         working-directory: node-images/fedora
         run: |
           BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
-          sudo podman save -o ${{ github.workspace }}/bootc-image.tar ${BOOTC_SRC}
+          sudo podman save --format oci-archive -o ${{ github.workspace }}/bootc-image.tar ${BOOTC_SRC}
 
       - name: Upload bootc image artifact
         uses: actions/upload-artifact@v7
@@ -372,9 +372,8 @@ jobs:
         with:
           name: node-image-composefs-${{ matrix.kube-minor }}
 
-      - name: Load images
+      - name: Load disk images
         run: |
-          sudo podman load -i bootc-image.tar
           sudo podman load -i node-image.tar
           sudo podman load -i node-image-composefs.tar
 
@@ -386,20 +385,18 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
-        run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+        run: |
+          sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+          sudo skopeo login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
       - name: Push bootc image
-        working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
-          sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:${TAG}
-          sudo podman push ${PUSH_DEST}:${TAG}
+          sudo skopeo copy oci-archive:bootc-image.tar docker://${PUSH_DEST}:${TAG}
           if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
-            sudo podman tag ${BOOTC_SRC} ${PUSH_DEST}:latest
-            sudo podman push ${PUSH_DEST}:latest
+            sudo skopeo copy oci-archive:bootc-image.tar docker://${PUSH_DEST}:latest
           fi
 
       - name: Push disk image
