@@ -89,6 +89,9 @@ jobs:
           sudo chmod 666 /dev/kvm
           ls -la /dev/kvm
 
+      - name: Start local registry
+        run: sudo podman run -d -p 5000:5000 --name registry docker.io/library/registry:2
+
       - name: Build bootc image
         working-directory: node-images/fedora
         run: sudo make build-bootc-image KUBE_MINOR=${{ matrix.kube-minor }}
@@ -100,6 +103,22 @@ jobs:
           TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Image tag: ${TAG}"
+
+      - name: Push bootc image to local registry
+        working-directory: node-images/fedora
+        run: |
+          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
+          sudo podman tag ${BOOTC_SRC} localhost:5000/node:${{ steps.meta.outputs.tag }}
+          sudo podman push --tls-verify=false localhost:5000/node:${{ steps.meta.outputs.tag }}
+
+      - name: Pull bootc image from local registry
+        working-directory: node-images/fedora
+        run: |
+          BOOTC_SRC=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
+          sudo podman rmi ${BOOTC_SRC} || true
+          sudo podman pull --tls-verify=false localhost:5000/node:${{ steps.meta.outputs.tag }}
+          sudo podman tag localhost:5000/node:${{ steps.meta.outputs.tag }} ${BOOTC_SRC}
+          echo "Bootc image digest: $(sudo podman inspect --format '{{.Digest}}' ${BOOTC_SRC})"
 
       - name: Save bootc image
         working-directory: node-images/fedora
