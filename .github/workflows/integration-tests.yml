@@ -321,7 +321,14 @@ jobs:
           podman volume prune -f 2>/dev/null || true
 
   push-node-images:
-    needs: [supported-versions, build-node-images, integration-tests, integration-tests-composefs, integration-tests-k8s-versions]
+    needs:
+      [
+        supported-versions,
+        build-node-images,
+        integration-tests,
+        integration-tests-composefs,
+        integration-tests-k8s-versions,
+      ]
     if: >-
       needs.build-node-images.result == 'success' &&
       (github.event_name == 'push' || inputs.push-node-images == true)
