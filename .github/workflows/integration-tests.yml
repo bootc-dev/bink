@@ -113,12 +113,6 @@ jobs:
           name: bootc-image-${{ matrix.kube-minor }}
           path: bootc-image.tar
 
-      - name: Print bootc image digest
-        working-directory: node-images/fedora
-        run: |
-          BOOTC_IMAGE=$(make -s print-bootc-image KUBE_MINOR=${{ matrix.kube-minor }})
-          sudo podman inspect --format '{{.Digest}}' ${BOOTC_IMAGE}
-
       - name: Build disk image
         working-directory: node-images/fedora
         run: sudo make build-disk-image KUBE_MINOR=${{ matrix.kube-minor }}
