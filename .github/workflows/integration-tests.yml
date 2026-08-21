@@ -68,6 +68,9 @@ jobs:
           ALL=$(curl -s https://endoflife.date/api/kubernetes.json | \
             jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
           NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
+          # Construct the staging branch tag based on the branch name that is suitable for container image
+          # tags. It converts all the character to lower cases, and replaces all non lower cases letter, numbers, '.'
+          # or '-' with a single hyphen.
           BRANCH_TAG=$(echo "${{ github.head_ref || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g')
           echo "all-versions=${ALL}" >> "$GITHUB_OUTPUT"
           echo "non-default-versions=${NON_DEFAULT}" >> "$GITHUB_OUTPUT"
@@ -439,4 +442,3 @@ jobs:
             sudo podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk-composefs
             sudo podman push ${PUSH_DEST}:latest-disk-composefs
           fi
-
