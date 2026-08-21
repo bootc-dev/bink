@@ -11,23 +11,33 @@ import (
 )
 
 func newStartCmd() *cobra.Command {
+	var authOnly bool
+
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start the local container registry",
-		Long:  "Start the shared local registry container, creating it if it doesn't exist",
+		Long:  "Start the shared local registry containers, creating them if they don't exist",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mgr, err := registrypkg.NewManager()
 			if err != nil {
 				return fmt.Errorf("creating registry manager: %w", err)
 			}
 
-			if err := mgr.EnsureRegistry(cmd.Context()); err != nil {
-				return fmt.Errorf("starting registry: %w", err)
+			if !authOnly {
+				if err := mgr.EnsureRegistry(cmd.Context()); err != nil {
+					return fmt.Errorf("starting registry: %w", err)
+				}
+			}
+
+			if err := mgr.EnsureAuthRegistry(cmd.Context()); err != nil {
+				return fmt.Errorf("starting auth registry: %w", err)
 			}
 
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&authOnly, "auth", false, "Start only the authenticated registry")
 
 	return cmd
 }

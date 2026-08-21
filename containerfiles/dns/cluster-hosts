@@ -1,1 +1,2 @@
 10.88.0.2 registry registry.cluster.local
+10.88.0.3 auth-registry auth-registry.cluster.local

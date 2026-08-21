@@ -76,6 +76,14 @@ const (
 	RegistryStaticIP      = "10.88.0.2"
 	RegistryHostname      = "registry"
 	RegistryVolume        = "bink-registry-data"
+	RegistryHTTPSecret    = "bink-shared-secret"
+
+	AuthRegistryContainerName = "bink-auth-registry"
+	AuthRegistryPort          = 5001
+	AuthRegistryStaticIP      = "10.88.0.3"
+	AuthRegistryHostname      = "auth-registry"
+	AuthRegistryUsername      = "testuser"
+	AuthRegistryPassword      = "testpassword"
 
 	HAProxyImage         = "docker.io/library/haproxy:lts-alpine"
 	HAProxyContainerName = "haproxy"
