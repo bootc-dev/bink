@@ -80,20 +80,6 @@ runs:
       shell: bash
       run: make build-bink
 
-    - name: Build cluster and DNS images
-      shell: bash
-      run: |
-        make build-cluster-image
-        make build-dns-image
-
-    - name: Verify prerequisites
-      shell: bash
-      run: |
-        test -f ./bink
-        podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
-        df -h /
-        free -h
-
     - name: Get image digests
       id: digests
       shell: bash
@@ -139,3 +125,19 @@ runs:
       with:
         path: /tmp/podman-image-cache
         key: podman-images-v2-${{ inputs.cache-key-prefix }}-${{ steps.digests.outputs.hash }}
+
+    # Build checkout-owned images after loading the cache so published images
+    # cannot replace changes made by the pull request under the same tags.
+    - name: Build cluster and DNS images
+      shell: bash
+      run: |
+        make build-cluster-image
+        make build-dns-image
+
+    - name: Verify prerequisites
+      shell: bash
+      run: |
+        test -f ./bink
+        podman images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+        df -h /
+        free -h
