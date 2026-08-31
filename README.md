@@ -126,3 +126,4 @@ source <(bink completion bash)
 ## Documentation
 
 - [Building Custom Node Images](docs/custom-node-images.md) — How to build and test with custom or patched packages
+- [Registry Usage](docs/registry.md) — How to populate and use the standard and authenticated registries
