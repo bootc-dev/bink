@@ -4,6 +4,7 @@
 package node
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -25,6 +26,10 @@ func testCloudInitData() CloudInitData {
 		RegistryPort:     config.RegistryPort,
 		RegistryHostname: config.RegistryHostname,
 		ServiceCIDR:      config.ServiceCIDR,
+
+		AuthRegistryStaticIP: config.AuthRegistryStaticIP,
+		AuthRegistryPort:     config.AuthRegistryPort,
+		AuthRegistryHostname: config.AuthRegistryHostname,
 	}
 }
 
@@ -116,6 +121,15 @@ func TestRenderTemplate_UserData(t *testing.T) {
 	registryURL := config.RegistryStaticIP + ":5000"
 	if !strings.Contains(s, registryURL) {
 		t.Errorf("missing registry URL %s", registryURL)
+	}
+
+	authRegistryURL := fmt.Sprintf("%s:%d", config.AuthRegistryStaticIP, config.AuthRegistryPort)
+	if !strings.Contains(s, authRegistryURL) {
+		t.Errorf("missing auth registry URL %s", authRegistryURL)
+	}
+	authRegistryFQDN := fmt.Sprintf("%s.%s:%d", config.AuthRegistryHostname, config.ClusterDomain, config.AuthRegistryPort)
+	if !strings.Contains(s, authRegistryFQDN) {
+		t.Errorf("missing auth registry FQDN %s", authRegistryFQDN)
 	}
 }
 
