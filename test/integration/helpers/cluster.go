@@ -54,9 +54,11 @@ func RunCommand(cmd *exec.Cmd, timeout ...time.Duration) *gexec.Session {
 // CreateCluster creates a cluster with the given name
 // This is a high-level helper that expects success
 // Uses auto-assigned ports (--api-port 0) to avoid port conflicts in tests
-func CreateCluster(name string) {
+func CreateCluster(name string, extraArgs ...string) {
 	GinkgoWriter.Printf("Creating cluster: %s (with auto-assigned API port)\n", name)
-	cmd := BinkCmd("cluster", "start", "--cluster-name", name, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-image", NodeImage())
+	args := []string{"cluster", "start", "--cluster-name", name, "--api-port", "0", "--memory", "1900", "--max-memory", "4096", "--node-image", NodeImage()}
+	args = append(args, extraArgs...)
+	cmd := BinkCmd(args...)
 	session := RunCommand(cmd, 10*time.Minute)
 	Expect(session.ExitCode()).To(Equal(0), "Failed to create cluster: %s", string(session.Err.Contents()))
 }

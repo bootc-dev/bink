@@ -5,7 +5,10 @@ package integration_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -15,6 +18,13 @@ import (
 
 	"github.com/bootc-dev/bink/internal/config"
 	"github.com/bootc-dev/bink/test/integration/helpers"
+)
+
+const (
+	registryTestNamespace   = metav1.NamespaceDefault
+	registryTestPodName     = "registry-test"
+	authRegistryTestPodName = "auth-registry-test"
+	podExecEchoMessage      = "hello"
 )
 
 var _ = Describe("Local Registry", func() {
@@ -56,8 +66,8 @@ var _ = Describe("Local Registry", func() {
 			config.RegistryHostname, config.ClusterDomain, config.RegistryPort)
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   "registry-test",
-				Labels: map[string]string{"run": "registry-test"},
+				Name:   registryTestPodName,
+				Labels: map[string]string{"run": registryTestPodName},
 			},
 			Spec: corev1.PodSpec{
 				RestartPolicy: corev1.RestartPolicyNever,
@@ -68,24 +78,147 @@ var _ = Describe("Local Registry", func() {
 				}},
 			},
 		}
-		helpers.CreatePod(kubeClient, "default", pod, 5*time.Minute)
+		helpers.CreatePod(kubeClient, registryTestNamespace, pod, 5*time.Minute)
 
 		By("Verifying the pod is running with the registry image")
-		runningPod, err := kubeClient.CoreV1().Pods("default").Get(
-			context.Background(), "registry-test", metav1.GetOptions{})
+		runningPod, err := kubeClient.CoreV1().Pods(registryTestNamespace).Get(
+			context.Background(), registryTestPodName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(runningPod.Status.Phase).To(Equal(corev1.PodRunning))
 		Expect(runningPod.Spec.Containers[0].Image).To(Equal(registryImage))
 
 		By("Verifying the container is functional by running a command inside it")
-		Eventually(func() string {
-			result, _ := helpers.PodExec(kubeconfigPath, "default", "registry-test",
-				[]string{"echo", "hello"})
-			return result
-		}, 1*time.Minute, 5*time.Second).Should(ContainSubstring("hello"))
+		Eventually(func() (string, error) {
+			return helpers.PodExec(kubeconfigPath, registryTestNamespace, registryTestPodName,
+				[]string{"echo", podExecEchoMessage})
+		}, 1*time.Minute, 5*time.Second).Should(ContainSubstring(podExecEchoMessage))
 
 		By("Cleaning up the pod")
-		helpers.DeletePod(kubeClient, "default", "registry-test")
+		helpers.DeletePod(kubeClient, registryTestNamespace, registryTestPodName)
+
+		By("Cleaning up the local registry tag")
+		helpers.ImageRemove(registryTag)
+	})
+
+	It("should pull from the authenticated registry using imagePullSecrets", func() {
+		authRegistryUser := "integration-" + clusterName
+		authRegistryPassword := "password-" + clusterName
+
+		By("Requiring an unused authenticated registry")
+		Expect(helpers.ContainerExists(config.AuthRegistryContainerName)).To(BeFalse(),
+			"authenticated registry already exists; stop it before running this test")
+
+		By("Starting an authenticated registry with test-specific credentials")
+		startSession := helpers.RunCommand(helpers.BinkCmd(
+			"registry", "start", "--auth",
+			"--registry-user", authRegistryUser,
+			"--registry-password", authRegistryPassword,
+		))
+		Expect(startSession.ExitCode()).To(Equal(0), "Failed to start authenticated registry")
+
+		DeferCleanup(func() {
+			session := helpers.RunCommand(helpers.BinkCmd("registry", "stop", "--auth"))
+			Expect(session.ExitCode()).To(Equal(0), "Failed to clean up authenticated registry")
+		})
+
+		By("Creating a single-node cluster")
+		helpers.CreateCluster(clusterName,
+			"--registry-user", authRegistryUser,
+			"--registry-password", authRegistryPassword)
+
+		By("Pulling busybox image locally")
+		helpers.ImagePull(config.TestBusyboxImage)
+
+		registryTag := fmt.Sprintf("localhost:%d/busybox:auth-registry-test", config.RegistryPort)
+
+		By("Tagging busybox for the local registry")
+		helpers.ImageTag(config.TestBusyboxImage, "auth-registry-test",
+			fmt.Sprintf("localhost:%d/busybox", config.RegistryPort))
+
+		By("Pushing busybox to the unauthenticated registry")
+		helpers.ImagePush(registryTag, registryTag)
+
+		By("Verifying the authenticated registry rejects anonymous requests")
+		client := &http.Client{Timeout: 10 * time.Second}
+		response, err := client.Get(fmt.Sprintf("http://localhost:%d/v2/", config.AuthRegistryPort))
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(response.Body.Close)
+		Expect(response.StatusCode).To(Equal(http.StatusUnauthorized))
+
+		By("Exposing API and creating Kubernetes client")
+		kubeClient, kubeconfigPath := helpers.SetupKubeClient(clusterName)
+		defer helpers.CleanupKubeconfig(kubeconfigPath)
+
+		By("Removing control-plane taint to allow scheduling on single-node cluster")
+		helpers.RemoveControlPlaneTaint(kubeClient, "node1")
+
+		By("Creating docker-registry secret with auth registry credentials")
+		authServer := fmt.Sprintf("%s.%s:%d",
+			config.AuthRegistryHostname, config.ClusterDomain, config.AuthRegistryPort)
+		authEncoded := base64.StdEncoding.EncodeToString(
+			[]byte(authRegistryUser + ":" + authRegistryPassword))
+		dockerConfig := map[string]any{
+			"auths": map[string]any{
+				authServer: map[string]any{
+					"username": authRegistryUser,
+					"password": authRegistryPassword,
+					"auth":     authEncoded,
+				},
+			},
+		}
+		dockerConfigJSON, err := json.Marshal(dockerConfig)
+		Expect(err).ToNot(HaveOccurred())
+
+		secretName := "auth-registry-secret"
+		_, err = kubeClient.CoreV1().Secrets(registryTestNamespace).Create(
+			context.Background(),
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: secretName},
+				Type:       corev1.SecretTypeDockerConfigJson,
+				Data:       map[string][]byte{corev1.DockerConfigJsonKey: dockerConfigJSON},
+			},
+			metav1.CreateOptions{},
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Deploying a pod that pulls from the authenticated registry")
+		authRegistryImage := fmt.Sprintf("%s.%s:%d/busybox:auth-registry-test",
+			config.AuthRegistryHostname, config.ClusterDomain, config.AuthRegistryPort)
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   authRegistryTestPodName,
+				Labels: map[string]string{"run": authRegistryTestPodName},
+			},
+			Spec: corev1.PodSpec{
+				RestartPolicy:    corev1.RestartPolicyNever,
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: secretName}},
+				Containers: []corev1.Container{{
+					Name:            "busybox",
+					Image:           authRegistryImage,
+					ImagePullPolicy: corev1.PullAlways,
+					Command:         []string{"sh", "-c", "echo 'auth-registry-pull-success' && sleep 3600"},
+				}},
+			},
+		}
+		helpers.CreatePod(kubeClient, registryTestNamespace, pod, 5*time.Minute)
+
+		By("Verifying the pod is running with the auth registry image")
+		runningPod, err := kubeClient.CoreV1().Pods(registryTestNamespace).Get(
+			context.Background(), authRegistryTestPodName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(runningPod.Status.Phase).To(Equal(corev1.PodRunning))
+		Expect(runningPod.Spec.Containers[0].Image).To(Equal(authRegistryImage))
+
+		By("Verifying the container is functional by running a command inside it")
+		Eventually(func() (string, error) {
+			return helpers.PodExec(kubeconfigPath, registryTestNamespace, authRegistryTestPodName,
+				[]string{"echo", podExecEchoMessage})
+		}, 1*time.Minute, 5*time.Second).Should(ContainSubstring(podExecEchoMessage))
+
+		By("Cleaning up the pod and secret")
+		helpers.DeletePod(kubeClient, registryTestNamespace, authRegistryTestPodName)
+		Expect(kubeClient.CoreV1().Secrets(registryTestNamespace).Delete(
+			context.Background(), secretName, metav1.DeleteOptions{})).To(Succeed())
 
 		By("Cleaning up the local registry tag")
 		helpers.ImageRemove(registryTag)
