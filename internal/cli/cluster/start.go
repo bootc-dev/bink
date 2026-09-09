@@ -30,6 +30,8 @@ func newStartCmd() *cobra.Command {
 	var exposePath string
 	var hostNetworkPopulator bool
 	var targetImgRef string
+	var registryUser string
+	var registryPassword string
 
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -45,7 +47,7 @@ func newStartCmd() *cobra.Command {
   bink cluster start --memory 4096 --expose ./kubeconfig`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logrus.New()
-			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath, hostNetworkPopulator, targetImgRef)
+			return runStart(cmd.Context(), logger, nodeName, nodeImage, apiPort, memory, maxMemory, exposePath, hostNetworkPopulator, targetImgRef, registryUser, registryPassword)
 		},
 	}
 
@@ -57,11 +59,18 @@ func newStartCmd() *cobra.Command {
 	cmd.Flags().StringVar(&exposePath, "expose", "", "Expose API and save kubeconfig to PATH after cluster is up")
 	cmd.Flags().BoolVar(&hostNetworkPopulator, "host-network-populator", false, "Use host networking for the image populator container (fixes DNS in nested podman)")
 	cmd.Flags().StringVar(&targetImgRef, "target-imgref", "", "Override the bootc image reference tracked by the VM (e.g., registry.cluster.local:5000/node:latest)")
+	cmd.Flags().StringVar(&registryUser, "registry-user", "", "Username for the authenticated registry")
+	cmd.Flags().StringVar(&registryPassword, "registry-password", "", "Password for the authenticated registry")
 
 	return cmd
 }
 
-func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string, hostNetworkPopulator bool, targetImgRef string) error {
+func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeImage string, apiPort int, memory int, maxMemory int, exposePath string, hostNetworkPopulator bool, targetImgRef string, registryUser string, registryPassword string) error {
+	authRegistryRequested, err := registry.AuthRegistryRequested(registryUser, registryPassword)
+	if err != nil {
+		return fmt.Errorf("invalid auth registry credentials: %w", err)
+	}
+
 	logger.Info("=== Creating Kubernetes cluster ===")
 	logger.Info("")
 
@@ -84,6 +93,11 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 	}
 	if err := registryMgr.EnsureRegistry(ctx); err != nil {
 		return fmt.Errorf("ensuring registry: %w", err)
+	}
+	if authRegistryRequested {
+		if err := registryMgr.EnsureAuthRegistry(ctx, registryUser, registryPassword); err != nil {
+			return fmt.Errorf("ensuring auth registry: %w", err)
+		}
 	}
 	logger.Info("")
 
@@ -197,6 +211,11 @@ func runStart(ctx context.Context, logger *logrus.Logger, nodeName string, nodeI
 	logger.Infof("  Push:  podman push --tls-verify=false localhost:%d/<image>:<tag>", config.RegistryPort)
 	logger.Infof("  Pull (in-cluster): %s.%s:%d/<image>:<tag>", config.RegistryHostname, config.ClusterDomain, config.RegistryPort)
 	logger.Info("")
+	if authRegistryRequested {
+		logger.Info("Auth registry (pull with credentials):")
+		logger.Infof("  Pull (in-cluster): %s.%s:%d/<image>:<tag>", config.AuthRegistryHostname, config.ClusterDomain, config.AuthRegistryPort)
+		logger.Info("")
+	}
 
 	if exposePath != "" {
 		logger.Info("Step 9: Exposing API server...")
