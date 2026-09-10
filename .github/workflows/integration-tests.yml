@@ -63,7 +63,7 @@ jobs:
       - name: Get supported Kubernetes versions
         id: set-matrix
         run: |
-          DEFAULT="1.35"
+          DEFAULT=$(make -s -C node-images/fedora print-kube-minor)
           FEDORA_VERSION="44"
           # TODO: check how to configure renovate to update this list automatically
           ALL='["1.36", "1.35", "1.34"]'
