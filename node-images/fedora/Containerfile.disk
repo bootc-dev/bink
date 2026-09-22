@@ -42,7 +42,7 @@ RUN mkdir -p /output ${LOG_DIR} && \
 RUN podman run --rm ${BOOTC_IMAGE} kubeadm config images list > /output/images.txt
 
 FROM scratch
-ARG KUBE_MINOR=1.35
+ARG KUBE_MINOR=1.36
 ARG BOOTC_IMAGE
 ARG BOOTC_DIGEST
 LABEL bink.kubeadm-version=${KUBE_MINOR}

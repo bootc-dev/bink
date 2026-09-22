@@ -17,7 +17,7 @@ const (
 	clusterImageBase = "ghcr.io/bootc-dev/bink/cluster"
 	dnsImageBase     = "ghcr.io/bootc-dev/bink/dns"
 
-	DefaultNodeImage = "ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk"
+	DefaultNodeImage = "ghcr.io/bootc-dev/bink/node:v1.36-fedora-44-disk"
 
 	DefaultBaseDisk              = "/images/disk.qcow2"
 	DefaultControlPlaneMemory    = 1900

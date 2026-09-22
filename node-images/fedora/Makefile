@@ -1,6 +1,6 @@
 .PHONY: build-bootc-image build-disk-image build-disk-image-composefs clean help
 
-KUBE_MINOR ?= 1.35
+KUBE_MINOR ?= 1.36
 FEDORA_VERSION ?= 44
 DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G

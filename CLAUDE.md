@@ -206,7 +206,7 @@ Host (podman)
   |
   +-- Container: k8s-mycluster-node1 (localhost/cluster:latest)
   |     |-- libvirt + qemu
-  |     |-- VM: Fedora bootc (kubeadm, crio, k8s 1.35)
+  |     |-- VM: Fedora bootc (kubeadm, crio, k8s 1.36)
   |     |     |-- NIC1 (passt): internet + SSH (2222) + API (6443, control-plane only)
   |     |     |-- NIC2 (multicast 230.0.0.1:5558): cluster network 10.0.0.0/24
   |     |     +-- Kubernetes control-plane

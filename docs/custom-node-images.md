@@ -70,7 +70,7 @@ cd bootc
 git checkout <commit-or-branch>
 
 podman build \
-  --build-arg base=ghcr.io/bootc-dev/bink/node:v1.35-fedora-44 \
+  --build-arg base=ghcr.io/bootc-dev/bink/node:v1.36-fedora-44 \
   -t localhost/custom-bootc-node:latest \
   .
 ```
@@ -82,7 +82,7 @@ This compiles bootc from source and installs it into an image derived from the b
 For simpler cases (installing a different package version), write a minimal Containerfile:
 
 ```dockerfile
-FROM ghcr.io/bootc-dev/bink/node:v1.35-fedora-44
+FROM ghcr.io/bootc-dev/bink/node:v1.36-fedora-44
 RUN dnf -y install <your-package>
 ```
 
@@ -178,7 +178,7 @@ Containerfile.disk  ->  qcow2 disk image  (bcvk to-disk)
 >   --cap-add=all \
 >   --security-opt=label=disable \
 >   --device /dev/fuse \
->   --build-arg KUBE_MINOR=1.35 \
+>   --build-arg KUBE_MINOR=1.36 \
 >   -t localhost/custom-node:latest \
 >   -f Containerfile \
 >   .
@@ -238,7 +238,7 @@ COPY my-source/ /src
 WORKDIR /src
 RUN make build
 
-FROM ghcr.io/bootc-dev/bink/node:v1.35-fedora-44
+FROM ghcr.io/bootc-dev/bink/node:v1.36-fedora-44
 COPY --from=custom-build /src/my-binary /usr/bin/my-binary
 ```
 
@@ -294,11 +294,11 @@ Variables in `node-images/fedora/Makefile`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KUBE_MINOR` | `1.35` | Kubernetes minor version |
+| `KUBE_MINOR` | `1.36` | Kubernetes minor version |
 | `FEDORA_VERSION` | `44` | Fedora base version |
 | `DISK_SIZE` | `10G` | VM disk size |
 | `BUILD_MEMORY` | `4G` | Memory for bcvk build |
-| `BOOTC_IMAGE` | `ghcr.io/bootc-dev/bink/node:v1.35-fedora-44` | Bootc OCI image name |
-| `NODE_IMAGE` | `ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk` | Disk image name |
-| `NODE_IMAGE_COMPOSEFS` | `ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk-composefs` | Composefs disk image name |
+| `BOOTC_IMAGE` | `ghcr.io/bootc-dev/bink/node:v1.36-fedora-44` | Bootc OCI image name |
+| `NODE_IMAGE` | `ghcr.io/bootc-dev/bink/node:v1.36-fedora-44-disk` | Disk image name |
+| `NODE_IMAGE_COMPOSEFS` | `ghcr.io/bootc-dev/bink/node:v1.36-fedora-44-disk-composefs` | Composefs disk image name |
 | `BCVK_EXTRA_ARGS` | (none) | Extra flags for `bcvk to-disk` |

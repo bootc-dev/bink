@@ -1,6 +1,6 @@
 FROM quay.io/fedora/fedora-bootc:44 AS builder
 
-ARG KUBE_MINOR=1.35
+ARG KUBE_MINOR=1.36
 # Pin kernel to 6.19.x to work around a kernel 7.0 regression.
 # https://github.com/bootc-dev/bink/issues/52
 ARG KERNEL_VERSION=6.19.14-300.fc44
