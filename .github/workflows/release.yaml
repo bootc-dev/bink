@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -17,10 +23,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          git rev-parse -q --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null
+          echo "version=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
@@ -33,7 +47,7 @@ jobs:
           podman cp bink-builder-tmp:/output/bink ./bink
           podman rm bink-builder-tmp
           chmod +x ./bink
-          ./bink version
+          podman run --rm localhost/bink-builder:latest /output/bink version
 
       - name: Build and push bink image
         run: |
@@ -66,4 +80,4 @@ jobs:
           gh release create ${{ steps.version.outputs.version }} \
             ./bink \
             --title "${{ steps.version.outputs.version }}" \
-            --generate-notes
+            --generate-notes --draft
