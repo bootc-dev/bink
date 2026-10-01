@@ -36,6 +36,21 @@ jobs:
           git rev-parse -q --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null
           echo "version=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Check GitHub Release
+        id: release_state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          is_draft=$(gh release list --limit 1000 --json tagName,isDraft \
+            --jq ".[] | select(.tagName == \"$RELEASE_TAG\") | .isDraft")
+          case "$is_draft" in
+            true) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            false) echo "Release $RELEASE_TAG is already published" >&2; exit 1 ;;
+            '') echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unexpected release state: $is_draft" >&2; exit 1 ;;
+          esac
+
       - name: Log in to GHCR
         run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
 
@@ -85,11 +100,21 @@ jobs:
           podman push ${{ env.REGISTRY }}/${{ github.repository }}/dns:${{ steps.version.outputs.version }}
           podman push ${{ env.REGISTRY }}/${{ github.repository }}/dns:latest
 
-      - name: Create GitHub Release
+      - name: Create or update draft GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+          RELEASE_EXISTS: ${{ steps.release_state.outputs.exists }}
         run: |
-          gh release create ${{ steps.version.outputs.version }} \
-            ./bink \
-            --title "${{ steps.version.outputs.version }}" \
-            --generate-notes --draft
+          if [[ "$RELEASE_EXISTS" == true ]]; then
+            [[ $(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft) == true ]] || {
+              echo "Release $RELEASE_TAG is no longer a draft" >&2
+              exit 1
+            }
+            gh release upload "$RELEASE_TAG" ./bink --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              ./bink \
+              --title "$RELEASE_TAG" \
+              --generate-notes --draft
+          fi
