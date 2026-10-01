@@ -39,15 +39,27 @@ jobs:
       - name: Log in to GHCR
         run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
 
-      - name: Build bink binary
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install build dependencies
         run: |
-          podman build --build-arg VERSION=${{ steps.version.outputs.version }} \
-            --target builder -t localhost/bink-builder:latest -f Containerfile .
-          podman create --name bink-builder-tmp localhost/bink-builder:latest
-          podman cp bink-builder-tmp:/output/bink ./bink
-          podman rm bink-builder-tmp
-          chmod +x ./bink
-          podman run --rm localhost/bink-builder:latest /output/bink version
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgpgme-dev \
+            libbtrfs-dev \
+            libdevmapper-dev \
+            pkg-config
+
+      - name: Build and verify bink binary
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          make build-bink VERSION="${RELEASE_TAG}"
+          ./bink version
 
       - name: Build and push bink image
         run: |
