@@ -19,24 +19,71 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/dns
+  # internal/config/defaults.go hardcodes this local build tag regardless of
+  # which repository checked it out, so `make build-dns-image` always
+  # produces this exact ref, not one derived from IMAGE_NAME above.
+  LOCAL_IMAGE: ghcr.io/bootc-dev/bink/dns:latest
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # The image is entirely microdnf-installed RPM content, nothing to
+        # cross-compile, so build each architecture on its own native runner.
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build DNS image
+        run: make build-dns-image
+
+      - name: Save DNS image
+        run: |
+          podman tag "${{ env.LOCAL_IMAGE }}" "localhost/dns:dev-${{ matrix.arch }}"
+          podman save -o "dns-image-${{ matrix.arch }}.tar" "localhost/dns:dev-${{ matrix.arch }}"
+
+      - name: Upload DNS image
+        uses: actions/upload-artifact@v7
+        with:
+          name: dns-image-${{ matrix.arch }}
+          path: dns-image-${{ matrix.arch }}.tar
+
+  push:
+    needs: build
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Download DNS images
+        uses: actions/download-artifact@v8
+        with:
+          pattern: dns-image-*
+          merge-multiple: true
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
-        run: podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+      - name: Assemble manifest list
+        run: |
+          podman load -i dns-image-amd64.tar
+          podman load -i dns-image-arm64.tar
+          podman manifest create localhost/dns:dev \
+            containers-storage:localhost/dns:dev-amd64 \
+            containers-storage:localhost/dns:dev-arm64
 
-      - name: Build DNS image
-        run: make build-dns-image
-
-      - name: Push
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
-        run: podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Push to GHCR
+        run: |
+          podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+          # v2s2 keeps the per-architecture manifests in the same format as
+          # the images published before this became a manifest list, so the
+          # only change downstream sees is the added list layer.
+          podman manifest push --all --format v2s2 \
+            localhost/dns:dev "docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
