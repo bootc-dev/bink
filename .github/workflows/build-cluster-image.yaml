@@ -39,49 +39,50 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - uses: bootc-dev/actions/bootc-host-setup@main
+
       - name: Build cluster image
         run: make build-cluster-image
 
-      - name: Save cluster image
-        run: |
-          podman tag "${{ env.LOCAL_IMAGE }}" "localhost/cluster:dev-${{ matrix.arch }}"
-          podman save -o "cluster-image-${{ matrix.arch }}.tar" "localhost/cluster:dev-${{ matrix.arch }}"
-
-      - name: Upload cluster image
-        uses: actions/upload-artifact@v7
+      - name: Push by digest
+        uses: bootc-dev/actions/build-push-image@main
         with:
-          name: cluster-image-${{ matrix.arch }}
-          path: cluster-image-${{ matrix.arch }}.tar
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          arch: ${{ matrix.arch }}
+          local-image: ${{ env.LOCAL_IMAGE }}
+          push: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push) }}
 
-  push:
+  manifest:
     needs: build
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Download cluster images
+      - uses: bootc-dev/actions/bootc-host-setup@main
+
+      - name: Download per-arch digests
         uses: actions/download-artifact@v8
         with:
-          pattern: cluster-image-*
+          path: digests
+          pattern: container-digests-*
           merge-multiple: true
 
-      - name: Assemble manifest list
-        run: |
-          podman load -i cluster-image-amd64.tar
-          podman load -i cluster-image-arm64.tar
-          podman manifest create localhost/cluster:dev \
-            containers-storage:localhost/cluster:dev-amd64 \
-            containers-storage:localhost/cluster:dev-arm64
-
-      - name: Push to GHCR
+      - name: Assemble and push manifest list
         run: |
           podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+          podman manifest create localhost/cluster:dev
+          for arch_file in digests/*; do
+            arch=$(basename "$arch_file")
+            digest=$(cat "$arch_file")
+            podman manifest add --arch "$arch" localhost/cluster:dev "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${digest}"
+          done
           # v2s2 keeps the per-architecture manifests in the same format as
           # the images published before this became a manifest list, so the
           # only change downstream sees is the added list layer.

@@ -3,9 +3,9 @@
 KUBE_MINOR ?= 1.35
 FEDORA_VERSION ?= 44
 DISK_SIZE ?= 10G
+# Used only by build-disk-image-composefs (still bcvk-based, see below).
 BUILD_MEMORY ?= 4G
 BUILD_LOG_DIR ?= /tmp/bcvk-logs
-BCVK_EXTRA_ARGS ?=
 # TODO: currently, there is a bug in bcvk where the digest for the image
 # doesn't match with the remote digest. A temporary fix is available at this
 # branch
@@ -31,9 +31,62 @@ build-bootc-image:
 		.
 	@echo "✅ Bootc image built: $(BOOTC_IMAGE)"
 
-# Build the disk image (qcow2 in a scratch container, for use as a podman image volume)
+# Build the disk image (qcow2 in a scratch container, for use as a podman image volume).
+# Uses bootc-image-builder, which builds via osbuild's loop-device/manifest
+# pipeline in its default privileged mode -- no VM boot, so no /dev/kvm
+# needed, unlike the bcvk-based composefs target below.
+#
+# DISK_SIZE is not honored here: bootc-image-builder has no CLI flag for it,
+# and rejects a customizations.filesystem minsize block for the qcow2 type
+# ("blueprint validation failed... not supported"). The image is sized by
+# content instead. DISK_SIZE still applies to build-disk-image-composefs,
+# which passes it straight through to bcvk.
+BIB_IMAGE ?= quay.io/centos-bootc/bootc-image-builder:latest
+
 build-disk-image:
-	@echo "=== Building node image with qcow2 disk ==="
+	@echo "=== Building node image with qcow2 disk (bootc-image-builder) ==="
+	OUTDIR=$$(mktemp -d) && \
+	trap 'rm -rf "$$OUTDIR"' EXIT && \
+	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
+	if [ -z "$(BOOTC_DIGEST)" ]; then \
+		BOOTC_DIGEST=$$(podman inspect --format '{{.Digest}}' $(BOOTC_IMAGE)); \
+	else \
+		BOOTC_DIGEST="$(BOOTC_DIGEST)"; \
+	fi && \
+	printf '[customizations.kernel]\nappend = "console=tty0 console=ttyS0,115200n8 console=hvc0"\n' \
+		> "$$OUTDIR/config.toml" && \
+	podman run --rm \
+		--privileged \
+		--security-opt label=disable \
+		--volume "$$STORAGE_PATH:$$STORAGE_PATH" \
+		--volume "$$OUTDIR:/output" \
+		--volume "$$OUTDIR/config.toml:/config.toml:ro" \
+		$(BIB_IMAGE) \
+		--local \
+		--type qcow2 \
+		--rootfs ext4 \
+		--config /config.toml \
+		$(BOOTC_IMAGE) && \
+	mv "$$OUTDIR/qcow2/disk.qcow2" "$$OUTDIR/disk.qcow2" && \
+	podman run --rm $(BOOTC_IMAGE) kubeadm config images list > "$$OUTDIR/images.txt" && \
+	podman build \
+		--build-arg BOOTC_IMAGE="$(BOOTC_IMAGE)" \
+		--build-arg KUBE_MINOR="$(KUBE_MINOR)" \
+		--build-arg BOOTC_DIGEST="$$BOOTC_DIGEST" \
+		-t $(NODE_IMAGE) \
+		-f Containerfile.disk \
+		"$$OUTDIR"
+	@echo "✅ Node image built: $(NODE_IMAGE)"
+	@echo ""
+	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
+
+# Build the composefs-backend variant. bootc-image-builder has no
+# user-facing way to force the composefs backend (it auto-derives it from
+# whether the source image uses a unified kernel), so this stays on bcvk,
+# which genuinely boots a VM for install-to-disk and therefore still needs
+# /dev/kvm -- amd64-only until that changes.
+build-disk-image-composefs:
+	@echo "=== Building node image with qcow2 disk, composefs backend (bcvk) ==="
 	STORAGE_PATH=$$(podman info --format '{{.Store.GraphRoot}}') && \
 	if [ -z "$(BOOTC_DIGEST)" ]; then \
 		BOOTC_DIGEST=$$(podman inspect --format '{{.Digest}}' $(BOOTC_IMAGE)); \
@@ -61,17 +114,12 @@ build-disk-image:
 		--build-arg MEMORY="$(BUILD_MEMORY)" \
 		--build-arg KUBE_MINOR="$(KUBE_MINOR)" \
 		--build-arg BOOTC_DIGEST="$$BOOTC_DIGEST" \
-		--build-arg BCVK_EXTRA_ARGS="$(BCVK_EXTRA_ARGS)" \
+		--build-arg BCVK_EXTRA_ARGS="--composefs-backend" \
 		--build-arg BCVK_REF="$(BCVK_REF)" \
-		-t $(NODE_IMAGE) \
-		-f Containerfile.disk \
+		-t $(NODE_IMAGE_COMPOSEFS) \
+		-f Containerfile.disk.bcvk \
 		.
-	@echo "✅ Node image built: $(NODE_IMAGE)"
-	@echo ""
-	@echo "This image can be used with: bink cluster start --node-image $(NODE_IMAGE)"
-
-build-disk-image-composefs:
-	$(MAKE) build-disk-image BCVK_EXTRA_ARGS="--composefs-backend" NODE_IMAGE="$(NODE_IMAGE_COMPOSEFS)"
+	@echo "✅ Node image built: $(NODE_IMAGE_COMPOSEFS)"
 
 print-image-tag:
 	@echo $(IMAGE_TAG)
@@ -104,8 +152,9 @@ help:
 	@echo "  NODE_IMAGE       - Node image name (default: $(NODE_IMAGE))"
 	@echo "  KUBE_MINOR       - Kubernetes minor version (default: $(KUBE_MINOR))"
 	@echo "  FEDORA_VERSION   - Fedora version (default: $(FEDORA_VERSION))"
-	@echo "  DISK_SIZE        - VM disk size (default: $(DISK_SIZE))"
-	@echo "  BUILD_MEMORY     - Memory for bcvk build (default: $(BUILD_MEMORY))"
+	@echo ""
+	@echo "  build-disk-image-composefs only (bcvk-based, amd64-only):"
+	@echo "  DISK_SIZE        - Disk image size (default: $(DISK_SIZE))"
+	@echo "  BUILD_MEMORY     - Memory for bcvk's install VM (default: $(BUILD_MEMORY))"
 	@echo "  BUILD_LOG_DIR    - Host path to collect bcvk logs (default: none)"
-	@echo "  BCVK_EXTRA_ARGS  - Extra arguments passed to bcvk to-disk (default: none)"
 	@echo "  BCVK_REF         - Git commit/tag to build bcvk from source (default: $(BCVK_REF))"

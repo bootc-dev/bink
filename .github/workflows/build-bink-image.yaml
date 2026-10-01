@@ -48,49 +48,50 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - uses: bootc-dev/actions/bootc-host-setup@main
+
       - name: Build bink CLI image
         run: make build-bink-image
 
-      - name: Save bink CLI image
-        run: |
-          podman tag "${{ env.LOCAL_IMAGE }}" "localhost/bink:dev-${{ matrix.arch }}"
-          podman save -o "bink-image-${{ matrix.arch }}.tar" "localhost/bink:dev-${{ matrix.arch }}"
-
-      - name: Upload bink CLI image
-        uses: actions/upload-artifact@v7
+      - name: Push by digest
+        uses: bootc-dev/actions/build-push-image@main
         with:
-          name: bink-image-${{ matrix.arch }}
-          path: bink-image-${{ matrix.arch }}.tar
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          arch: ${{ matrix.arch }}
+          local-image: ${{ env.LOCAL_IMAGE }}
+          push: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push) }}
 
-  push:
+  manifest:
     needs: build
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Download bink CLI images
+      - uses: bootc-dev/actions/bootc-host-setup@main
+
+      - name: Download per-arch digests
         uses: actions/download-artifact@v8
         with:
-          pattern: bink-image-*
+          path: digests
+          pattern: container-digests-*
           merge-multiple: true
 
-      - name: Assemble manifest list
-        run: |
-          podman load -i bink-image-amd64.tar
-          podman load -i bink-image-arm64.tar
-          podman manifest create localhost/bink:dev \
-            containers-storage:localhost/bink:dev-amd64 \
-            containers-storage:localhost/bink:dev-arm64
-
-      - name: Push to GHCR
+      - name: Assemble and push manifest list
         run: |
           podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+          podman manifest create localhost/bink:dev
+          for arch_file in digests/*; do
+            arch=$(basename "$arch_file")
+            digest=$(cat "$arch_file")
+            podman manifest add --arch "$arch" localhost/bink:dev "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${digest}"
+          done
           # v2s2 keeps the per-architecture manifests in the same format as
           # the images published before this became a manifest list, so the
           # only change downstream sees is the added list layer.

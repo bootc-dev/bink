@@ -1,0 +1,52 @@
+ARG FEDORA_VERSION=44
+ARG BCVK_REF=main
+
+FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION} AS bcvk-builder
+ARG BCVK_REF
+RUN dnf install -y --setopt=install_weak_deps=0 git rust cargo openssl-devel pkg-config && dnf clean all
+# TODO: currently, there is a bug in bcvk where the digest for the image
+# doesn't match with the remote digest. A temporary fix is available at this
+# repository. See: https://github.com/bootc-dev/bcvk/pull/314
+RUN git clone https://github.com/Johan-Liebert1/bcvk.git /bcvk && \
+    git -C /bcvk checkout ${BCVK_REF} && \
+    cargo build --release --manifest-path /bcvk/Cargo.toml
+
+FROM quay.io/fedora/fedora-minimal:${FEDORA_VERSION} AS builder
+RUN dnf install -y --setopt=install_weak_deps=0 qemu-kvm qemu-img virtiofsd podman binutils openssh && dnf clean all
+COPY --from=bcvk-builder /bcvk/target/release/bcvk /usr/local/bin/bcvk
+RUN printf '[containers]\nnetns="host"\ncgroups="disabled"\n[engine]\ncgroup_manager="cgroupfs"\n' \
+    > /etc/containers/containers.conf
+
+ARG STORAGE_PATH
+ARG BOOTC_IMAGE
+ARG DISK_SIZE=10G
+ARG MEMORY=4G
+ARG LOG_DIR=/tmp/bcvk-logs
+ARG BCVK_EXTRA_ARGS=""
+ENV CONTAINERS_STORAGE_CONF=/tmp/storage.conf
+ENV RUST_LOG=debug
+RUN mkdir -p /output ${LOG_DIR} && \
+    printf "[storage]\ndriver = \"overlay\"\ngraphroot = \"${STORAGE_PATH}\"\n" > $CONTAINERS_STORAGE_CONF && \
+    bcvk to-disk -K \
+    --karg 'console=tty0' \
+    --karg 'console=ttyS0,115200n8' \
+    --karg 'console=hvc0' \
+    --filesystem ext4 \
+    --format qcow2 \
+    --memory ${MEMORY} \
+    --disk-size ${DISK_SIZE} \
+    --log-dir journal,console=${LOG_DIR} \
+    ${BCVK_EXTRA_ARGS} \
+    ${BOOTC_IMAGE} \
+    /output/disk.qcow2
+RUN podman run --rm ${BOOTC_IMAGE} kubeadm config images list > /output/images.txt
+
+FROM scratch
+ARG KUBE_MINOR=1.35
+ARG BOOTC_IMAGE
+ARG BOOTC_DIGEST
+LABEL bink.kubeadm-version=${KUBE_MINOR}
+LABEL bink.bootc-image=${BOOTC_IMAGE}
+LABEL bink.bootc-image-digest=${BOOTC_DIGEST}
+COPY --from=builder /output/disk.qcow2 /disk.qcow2
+COPY --from=builder /output/images.txt /images.txt

@@ -30,7 +30,7 @@ env:
     docker.io/library/registry:2
     docker.io/library/haproxy:lts-alpine
     quay.io/libpod/busybox:latest
-  PUSH_REGISTRY: ghcr.io/bootc-dev/bink
+  PUSH_REGISTRY: ghcr.io/zarcen/bink # TEMP-TEST-ONLY, revert before squash
   PUSH_IMAGE: node
 
 jobs:
@@ -81,11 +81,15 @@ jobs:
   build-node-images:
     needs: [changes, supported-versions]
     if: needs.changes.outputs.node-images == 'true' || inputs.build-node-images == true
-    runs-on: ubuntu-latest
+    # kube-minor and arch are independent axes here (unlike the sibling
+    # bink/cluster/dns workflows, which only vary by arch), so the
+    # runner is picked with an expression rather than a paired `include:`.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
         kube-minor: ${{ fromJson(needs.supported-versions.outputs.all-versions) }}
+        arch: [amd64, arm64]
     permissions:
       contents: read
       packages: write
@@ -93,7 +97,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - uses: bootc-dev/actions/bootc-host-setup@main
+
+      # Only the composefs path below still uses bcvk, which boots a real VM
+      # and needs KVM. The main disk image build uses bootc-image-builder,
+      # which doesn't, so arm64 (no /dev/kvm on ubuntu-24.04-arm) skips this.
       - name: Set up KVM
+        if: matrix.arch == 'amd64'
         run: |
           sudo chmod 666 /dev/kvm
           ls -la /dev/kvm
@@ -110,7 +120,9 @@ jobs:
         working-directory: node-images/fedora
         run: |
           TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
-          STAGING_TAG=${{ needs.supported-versions.outputs.branch-tag }}-${TAG}
+          # Arch-suffixed so the amd64 and arm64 legs don't clobber each
+          # other's staging tag when pushing concurrently.
+          STAGING_TAG=${{ needs.supported-versions.outputs.branch-tag }}-${TAG}-${{ matrix.arch }}
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "staging-tag=${STAGING_TAG}" >> "$GITHUB_OUTPUT"
           echo "Image tag: ${TAG} (staging: ${STAGING_TAG})"
@@ -142,6 +154,10 @@ jobs:
         if: github.event_name == 'push' || inputs.push-node-images == true
         run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
+      # Staged under an arch-suffixed tag (not a meaningful final tag -- just
+      # a vehicle to get bytes into the registry). push-node-images reads
+      # both arches' staging tags back and assembles them into one
+      # multi-arch manifest under the real tags, after tests pass.
       - name: Push bootc image to GHCR (staging)
         if: github.event_name == 'push' || inputs.push-node-images == true
         working-directory: node-images/fedora
@@ -161,23 +177,33 @@ jobs:
           DISK_SRC=$(make -s print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
           sudo podman save -o ${{ github.workspace }}/node-image.tar ${DISK_SRC}
 
+      # Arch-suffixed on both legs (including amd64, a rename from before this
+      # matrix gained an arch dimension) so downstream jobs pull a specific
+      # arch's artifact by an unambiguous name rather than relying on which
+      # leg happened to upload last.
       - name: Upload disk image artifact
         uses: actions/upload-artifact@v7
         with:
-          name: node-image-${{ matrix.kube-minor }}
+          name: node-image-${{ matrix.kube-minor }}-${{ matrix.arch }}
           path: node-image.tar
 
+      # bootc-image-builder has no user-facing way to force the composefs
+      # backend (see node-images/fedora/Makefile), so this variant stays on
+      # bcvk, which needs KVM and so stays amd64-only until that changes.
       - name: Build composefs disk image
+        if: matrix.arch == 'amd64'
         working-directory: node-images/fedora
         run: sudo make build-disk-image-composefs KUBE_MINOR=${{ matrix.kube-minor }}
 
       - name: Save composefs disk image
+        if: matrix.arch == 'amd64'
         working-directory: node-images/fedora
         run: |
           DISK_SRC=$(make -s print-node-image-composefs KUBE_MINOR=${{ matrix.kube-minor }})
           sudo podman save -o ${{ github.workspace }}/node-image-composefs.tar ${DISK_SRC}
 
       - name: Upload composefs disk image artifact
+        if: matrix.arch == 'amd64'
         uses: actions/upload-artifact@v7
         with:
           name: node-image-composefs-${{ matrix.kube-minor }}
@@ -191,7 +217,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: build-logs-${{ matrix.kube-minor }}
+          name: build-logs-${{ matrix.kube-minor }}-${{ matrix.arch }}
           path: /tmp/bink-logs/
 
   integration-tests:
@@ -209,7 +235,10 @@ jobs:
         if: needs.build-node-images.result == 'success'
         uses: actions/download-artifact@v8
         with:
-          name: node-image-${{ needs.supported-versions.outputs.default-version }}
+          # This job still only boot-tests amd64; arm64 disk images are
+          # built above but not yet exercised here (needs KVM, which
+          # ubuntu-24.04-arm doesn't have).
+          name: node-image-${{ needs.supported-versions.outputs.default-version }}-amd64
 
       - name: Load node image
         if: needs.build-node-images.result == 'success'
@@ -316,7 +345,8 @@ jobs:
         if: needs.build-node-images.result == 'success'
         uses: actions/download-artifact@v8
         with:
-          name: node-image-${{ matrix.kube-minor }}
+          # This job still only boot-tests amd64; see build-node-images.
+          name: node-image-${{ matrix.kube-minor }}-amd64
 
       - name: Load node image
         if: needs.build-node-images.result == 'success'
@@ -376,10 +406,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Download disk image artifact
+      - uses: bootc-dev/actions/bootc-host-setup@main
+
+      # Downloaded to separate paths: both artifacts contain a file named
+      # identically (node-image.tar), and both arches' loaded images share
+      # the same internal tag (NODE_IMAGE doesn't vary by arch), so each
+      # gets re-tagged with an arch suffix immediately after loading below.
+      - name: Download amd64 disk image artifact
         uses: actions/download-artifact@v8
         with:
-          name: node-image-${{ matrix.kube-minor }}
+          name: node-image-${{ matrix.kube-minor }}-amd64
+          path: amd64
+
+      - name: Download arm64 disk image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: node-image-${{ matrix.kube-minor }}-arm64
+          path: arm64
 
       - name: Download composefs disk image artifact
         uses: actions/download-artifact@v8
@@ -387,46 +430,60 @@ jobs:
           name: node-image-composefs-${{ matrix.kube-minor }}
 
       - name: Load images
+        working-directory: node-images/fedora
         run: |
-          sudo podman load -i node-image.tar
-          sudo podman load -i node-image-composefs.tar
+          DISK_SRC=$(make -s print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
+          sudo podman load -i ../../amd64/node-image.tar
+          sudo podman tag "${DISK_SRC}" "localhost/node-disk:${{ matrix.kube-minor }}-amd64"
+          sudo podman load -i ../../arm64/node-image.tar
+          sudo podman tag "${DISK_SRC}" "localhost/node-disk:${{ matrix.kube-minor }}-arm64"
+          sudo podman load -i ../../node-image-composefs.tar
 
       - name: Determine image tag
         id: meta
         working-directory: node-images/fedora
         run: |
           TAG=$(make -s print-image-tag KUBE_MINOR=${{ matrix.kube-minor }})
-          STAGING_TAG=${{ needs.supported-versions.outputs.branch-tag }}-${TAG}
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "staging-tag=${STAGING_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         run: sudo podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
+      # Assembles the two per-arch images staged by build-node-images (under
+      # arch-suffixed tags, see the comment there) into one real multi-arch
+      # manifest. Note this is an upgrade from before any arm64 work: the
+      # bootc image was previously published as a single plain (non-list)
+      # amd64 image, not a manifest list.
       - name: Push bootc image
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          STAGING_TAG=${{ steps.meta.outputs.staging-tag }}
+          BRANCH_TAG=${{ needs.supported-versions.outputs.branch-tag }}
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
-          sudo skopeo copy docker://${PUSH_DEST}:${STAGING_TAG} docker://${PUSH_DEST}:${TAG}
+          sudo podman manifest create localhost/node-bootc:manifest
+          sudo podman manifest add localhost/node-bootc:manifest "${PUSH_DEST}:${BRANCH_TAG}-${TAG}-amd64"
+          sudo podman manifest add localhost/node-bootc:manifest "${PUSH_DEST}:${BRANCH_TAG}-${TAG}-arm64"
+          sudo podman manifest push --all localhost/node-bootc:manifest "docker://${PUSH_DEST}:${TAG}"
           if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
-            sudo skopeo copy docker://${PUSH_DEST}:${STAGING_TAG} docker://${PUSH_DEST}:latest
+            sudo podman manifest push --all localhost/node-bootc:manifest "docker://${PUSH_DEST}:latest"
           fi
 
+      # Both arches are already loaded locally (see Load images above), so
+      # this assembles the manifest straight from local storage -- no
+      # registry round-trip needed, unlike the bootc image above.
       - name: Push disk image
         working-directory: node-images/fedora
         run: |
           TAG=${{ steps.meta.outputs.tag }}
-          DISK_SRC=$(make -s print-node-image KUBE_MINOR=${{ matrix.kube-minor }})
           PUSH_DEST=${{ env.PUSH_REGISTRY }}/${{ env.PUSH_IMAGE }}
 
-          sudo podman tag ${DISK_SRC} ${PUSH_DEST}:${TAG}-disk
-          sudo podman push ${PUSH_DEST}:${TAG}-disk
+          sudo podman manifest create localhost/node-disk:manifest \
+            containers-storage:localhost/node-disk:${{ matrix.kube-minor }}-amd64 \
+            containers-storage:localhost/node-disk:${{ matrix.kube-minor }}-arm64
+          sudo podman manifest push --all localhost/node-disk:manifest "docker://${PUSH_DEST}:${TAG}-disk"
           if [ "${{ matrix.kube-minor }}" = "${{ needs.supported-versions.outputs.default-version }}" ]; then
-            sudo podman tag ${DISK_SRC} ${PUSH_DEST}:latest-disk
-            sudo podman push ${PUSH_DEST}:latest-disk
+            sudo podman manifest push --all localhost/node-disk:manifest "docker://${PUSH_DEST}:latest-disk"
           fi
 
       - name: Push composefs disk image

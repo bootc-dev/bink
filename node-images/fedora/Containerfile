@@ -4,8 +4,16 @@ ARG KUBE_MINOR=1.35
 # Pin kernel to 6.19.x to work around a kernel 7.0 regression.
 # https://github.com/bootc-dev/bink/issues/52
 ARG KERNEL_VERSION=6.19.14-300.fc44
-RUN dnf -y install 'dnf5-command(copr)' && \
-    dnf -y copr enable rhcontainerbot/bootc fedora-44-x86_64
+# The copr repo names architectures differently than podman's TARGETARCH
+# (amd64/arm64), so translate rather than assume x86_64.
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+      amd64) COPR_ARCH=x86_64 ;; \
+      arm64) COPR_ARCH=aarch64 ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    dnf -y install 'dnf5-command(copr)' && \
+    dnf -y copr enable rhcontainerbot/bootc "fedora-44-${COPR_ARCH}"
 RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --manifest=minimal \
     --no-docs \
