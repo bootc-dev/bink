@@ -137,6 +137,27 @@ func CreatePod(client *kubernetes.Clientset, namespace string, pod *corev1.Pod, 
 	WaitForPodReady(client, namespace, fmt.Sprintf("run=%s", pod.Name), timeout)
 }
 
+// CreateAuthPod creates a pod that pulls from the authenticated registry using imagePullSecrets.
+func CreateAuthPod(client *kubernetes.Clientset, namespace, podName, image, secretName string, timeout time.Duration) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   podName,
+			Labels: map[string]string{"run": podName},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy:    corev1.RestartPolicyNever,
+			ImagePullSecrets: []corev1.LocalObjectReference{{Name: secretName}},
+			Containers: []corev1.Container{{
+				Name:            "busybox",
+				Image:           image,
+				ImagePullPolicy: corev1.PullAlways,
+				Command:         []string{"sh", "-c", "echo 'auth-registry-pull-success' && sleep 3600"},
+			}},
+		},
+	}
+	CreatePod(client, namespace, pod, timeout)
+}
+
 // DeletePod deletes a pod. Does not fail if already gone.
 func DeletePod(client *kubernetes.Clientset, namespace, name string) {
 	_ = client.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
