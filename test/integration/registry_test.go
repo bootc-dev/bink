@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	registryTestNamespace   = metav1.NamespaceDefault
-	registryTestPodName     = "registry-test"
-	authRegistryTestPodName = "auth-registry-test"
-	podExecEchoMessage      = "hello"
+	registryTestNamespace          = metav1.NamespaceDefault
+	registryTestPodName            = "registry-test"
+	authRegistryTestPodName        = "auth-registry-test"
+	authRegistryRotatedTestPodName = "auth-registry-rotated-test"
+	podExecEchoMessage             = "hello"
 )
 
 var _ = Describe("Local Registry", func() {
@@ -184,23 +185,8 @@ var _ = Describe("Local Registry", func() {
 		By("Deploying a pod that pulls from the authenticated registry")
 		authRegistryImage := fmt.Sprintf("%s.%s:%d/busybox:auth-registry-test",
 			config.AuthRegistryHostname, config.ClusterDomain, config.AuthRegistryPort)
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   authRegistryTestPodName,
-				Labels: map[string]string{"run": authRegistryTestPodName},
-			},
-			Spec: corev1.PodSpec{
-				RestartPolicy:    corev1.RestartPolicyNever,
-				ImagePullSecrets: []corev1.LocalObjectReference{{Name: secretName}},
-				Containers: []corev1.Container{{
-					Name:            "busybox",
-					Image:           authRegistryImage,
-					ImagePullPolicy: corev1.PullAlways,
-					Command:         []string{"sh", "-c", "echo 'auth-registry-pull-success' && sleep 3600"},
-				}},
-			},
-		}
-		helpers.CreatePod(kubeClient, registryTestNamespace, pod, 5*time.Minute)
+		helpers.CreateAuthPod(kubeClient, registryTestNamespace, authRegistryTestPodName,
+			authRegistryImage, secretName, 5*time.Minute)
 
 		By("Verifying the pod is running with the auth registry image")
 		runningPod, err := kubeClient.CoreV1().Pods(registryTestNamespace).Get(
@@ -215,8 +201,79 @@ var _ = Describe("Local Registry", func() {
 				[]string{"echo", podExecEchoMessage})
 		}, 1*time.Minute, 5*time.Second).Should(ContainSubstring(podExecEchoMessage))
 
-		By("Cleaning up the pod and secret")
+		By("Verifying the original credentials are accepted before rotation")
+		authURL := fmt.Sprintf("http://localhost:%d/v2/", config.AuthRegistryPort)
+		client = &http.Client{Timeout: 10 * time.Second}
+		req, err := http.NewRequest("GET", authURL, nil)
+		Expect(err).ToNot(HaveOccurred())
+		req.SetBasicAuth(authRegistryUser, authRegistryPassword)
+		response, err = client.Do(req)
+		Expect(err).ToNot(HaveOccurred())
+		response.Body.Close()
+		Expect(response.StatusCode).To(Equal(http.StatusOK))
+
+		newRegistryUser := "rotated-" + clusterName
+		newRegistryPassword := "rotated-password-" + clusterName
+
+		By("Updating the auth registry password")
+		updateSession := helpers.RunCommand(helpers.BinkCmd(
+			"registry", "update-password",
+			"--registry-user", newRegistryUser,
+			"--registry-password", newRegistryPassword,
+		))
+		Expect(updateSession.ExitCode()).To(Equal(0), "Failed to update auth registry password")
+
+		By("Verifying the old credentials are rejected after rotation")
+		req, err = http.NewRequest("GET", authURL, nil)
+		Expect(err).ToNot(HaveOccurred())
+		req.SetBasicAuth(authRegistryUser, authRegistryPassword)
+		response, err = client.Do(req)
+		Expect(err).ToNot(HaveOccurred())
+		response.Body.Close()
+		Expect(response.StatusCode).To(Equal(http.StatusUnauthorized))
+
+		By("Verifying the new credentials are accepted after rotation")
+		req, err = http.NewRequest("GET", authURL, nil)
+		Expect(err).ToNot(HaveOccurred())
+		req.SetBasicAuth(newRegistryUser, newRegistryPassword)
+		response, err = client.Do(req)
+		Expect(err).ToNot(HaveOccurred())
+		response.Body.Close()
+		Expect(response.StatusCode).To(Equal(http.StatusOK))
+
+		By("Updating the Kubernetes pull secret with new credentials")
+		newAuthEncoded := base64.StdEncoding.EncodeToString(
+			[]byte(newRegistryUser + ":" + newRegistryPassword))
+		newDockerConfig := map[string]any{
+			"auths": map[string]any{
+				authServer: map[string]any{
+					"username": newRegistryUser,
+					"password": newRegistryPassword,
+					"auth":     newAuthEncoded,
+				},
+			},
+		}
+		newDockerConfigJSON, err := json.Marshal(newDockerConfig)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = kubeClient.CoreV1().Secrets(registryTestNamespace).Update(
+			context.Background(),
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: secretName},
+				Type:       corev1.SecretTypeDockerConfigJson,
+				Data:       map[string][]byte{corev1.DockerConfigJsonKey: newDockerConfigJSON},
+			},
+			metav1.UpdateOptions{},
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Creating a new pod to verify pull works with new credentials")
+		helpers.CreateAuthPod(kubeClient, registryTestNamespace, authRegistryRotatedTestPodName,
+			authRegistryImage, secretName, 5*time.Minute)
+
+		By("Cleaning up the pods and secret")
 		helpers.DeletePod(kubeClient, registryTestNamespace, authRegistryTestPodName)
+		helpers.DeletePod(kubeClient, registryTestNamespace, authRegistryRotatedTestPodName)
 		Expect(kubeClient.CoreV1().Secrets(registryTestNamespace).Delete(
 			context.Background(), secretName, metav1.DeleteOptions{})).To(Succeed())
 
