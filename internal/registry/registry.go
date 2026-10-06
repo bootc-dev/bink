@@ -202,7 +202,7 @@ func (m *Manager) RegistryInfo(ctx context.Context) (*RegistryStatus, error) {
 
 // EnsureAuthRegistry starts (or creates) the authenticated registry. Credentials are not
 // stored anywhere inspectable, so they cannot be compared against an already-running
-// container: to change them, stop the registry and start it again.
+// container: to change them, use UpdateAuthRegistryPassword.
 func (m *Manager) EnsureAuthRegistry(ctx context.Context, username, password string) error {
 	logrus.Info("Ensuring authenticated registry is running")
 	if err := ValidateAuthCredentials(username, password); err != nil {
@@ -287,6 +287,44 @@ func (m *Manager) createAuthContainer(ctx context.Context, username, password st
 	if err != nil {
 		return fmt.Errorf("creating auth registry container: %w", err)
 	}
+	return nil
+}
+
+func (m *Manager) UpdateAuthRegistryPassword(ctx context.Context, username, password string) error {
+	if err := ValidateAuthCredentials(username, password); err != nil {
+		return err
+	}
+
+	exists, err := m.podman.ContainerExists(ctx, config.AuthRegistryContainerName)
+	if err != nil {
+		return fmt.Errorf("checking auth registry container: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("auth registry container %q does not exist", config.AuthRegistryContainerName)
+	}
+
+	status, err := m.podman.ContainerStatus(ctx, config.AuthRegistryContainerName)
+	if err != nil {
+		return fmt.Errorf("checking auth registry status: %w", err)
+	}
+	if status != define.ContainerStateRunning.String() {
+		return fmt.Errorf("auth registry is not running (status: %s)", status)
+	}
+
+	htpasswdEntry, err := generateHtpasswd(username, password)
+	if err != nil {
+		return fmt.Errorf("generating htpasswd: %w", err)
+	}
+
+	escaped := strings.ReplaceAll(htpasswdEntry, "'", "'\\''")
+	_, err = m.podman.ContainerExec(ctx, config.AuthRegistryContainerName, []string{
+		"/bin/sh", "-c", fmt.Sprintf("printf '%%s\\n' '%s' > /auth/htpasswd", escaped),
+	})
+	if err != nil {
+		return fmt.Errorf("updating htpasswd in auth registry: %w", err)
+	}
+
+	logrus.Infof("Auth registry password updated for user %q", username)
 	return nil
 }
 

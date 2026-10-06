@@ -17,6 +17,7 @@ func NewRegistryCmd() *cobra.Command {
 	cmd.AddCommand(newStartCmd())
 	cmd.AddCommand(newStopCmd())
 	cmd.AddCommand(newInfoCmd())
+	cmd.AddCommand(newUpdatePasswordCmd())
 
 	return cmd
 }
