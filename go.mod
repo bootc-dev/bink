@@ -1,6 +1,6 @@
 module github.com/bootc-dev/bink
 
-go 1.26.8
+go 1.27.3
 
 require (
 	github.com/google/uuid v1.6.0
@@ -190,3 +190,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 	tags.cncf.io/container-device-interface v1.1.1 // indirect
 )
+
+tool github.com/onsi/ginkgo/v2/ginkgo
