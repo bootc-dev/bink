@@ -37,8 +37,6 @@ jobs:
 
       - name: Configure kernel for nested containers
         run: |
-          sudo aa-teardown 2>/dev/null || true
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
@@ -46,6 +44,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y podman
+
+      - name: Set up AppArmor
+        uses: ./.github/actions/setup-apparmor
 
       - name: Configure Podman
         run: |
