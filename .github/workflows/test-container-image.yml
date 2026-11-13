@@ -18,7 +18,7 @@ concurrency:
 env:
   BINK_RUNTIME_IMAGES: >-
     ghcr.io/bootc-dev/bink/cluster:latest
-    ghcr.io/bootc-dev/bink/node:v1.35-fedora-44-disk
+    ghcr.io/bootc-dev/bink/node:v1.36-fedora-44-disk
     ghcr.io/bootc-dev/bink/dns:latest
 
 jobs:
@@ -107,7 +107,7 @@ jobs:
         run: sudo make build-bink-image
 
       - name: Test nested mode
-        run: sudo -E hack/test-container-image.sh nested
+        run: sudo env IMAGE_CACHE_DIR="$IMAGE_CACHE_DIR" hack/test-container-image.sh nested
         timeout-minutes: 40
         env:
           IMAGE_CACHE_DIR: /tmp/podman-image-cache

@@ -15,6 +15,7 @@ RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --install kubernetes${KUBE_MINOR}-kubeadm \
     --install kubernetes${KUBE_MINOR}-client \
     --install cri-o${KUBE_MINOR} \
+    --install containers-common \
     --install qemu-guest-agent \
     --install bind-utils \
     --install iputils \
@@ -37,6 +38,8 @@ RUN sed -i 's|"/opt/cni/bin"|"/var/lib/cni/bin"|g' /etc/crio/crio.conf && \
         mkdir -p /etc/crio/crio.conf.d && \
         printf '[crio.runtime]\npinns_path = "/usr/libexec/crio/pinns"\n' > /etc/crio/crio.conf.d/04-pinns.conf; \
     fi
+RUN mkdir -p /etc/crio/crio.conf.d && \
+    printf '[crio.image]\nsignature_policy = "/usr/share/containers/policy.json"\n' > /etc/crio/crio.conf.d/05-signature-policy.conf
 RUN bootc container lint
 
 LABEL containers.bootc 1
