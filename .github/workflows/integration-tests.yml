@@ -50,6 +50,7 @@ jobs:
             node-images:
               - 'node-images/fedora/**'
               - '.github/workflows/integration-tests.yml'
+              - '.github/actions/setup-apparmor/**'
 
   supported-versions:
     runs-on: ubuntu-latest
@@ -97,6 +98,9 @@ jobs:
         run: |
           sudo chmod 666 /dev/kvm
           ls -la /dev/kvm
+
+      - name: Set up AppArmor
+        uses: ./.github/actions/setup-apparmor
 
       - name: Start local registry
         run: sudo podman run -d -p 5000:5000 --name registry docker.io/library/registry:2

@@ -1,0 +1,21 @@
+name: Set up AppArmor for bink
+description: Remove runner profiles that block bwrap and passt
+
+runs:
+  using: composite
+  steps:
+    - name: Remove restrictive profiles
+      shell: bash
+      run: |
+        sudo systemctl disable --now apparmor 2>/dev/null || true
+        sudo aa-teardown 2>/dev/null || true
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        if sudo test -r /sys/kernel/security/apparmor/profiles && \
+           sudo grep -Eq '^(unpriv_bwrap|passt) ' /sys/kernel/security/apparmor/profiles; then
+          echo 'AppArmor still has a profile that blocks bink builds or tests' >&2
+          exit 1
+        fi
+        if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" != 0 ]; then
+          echo 'AppArmor still restricts unprivileged user namespaces' >&2
+          exit 1
+        fi
