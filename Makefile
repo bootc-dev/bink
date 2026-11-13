@@ -76,7 +76,7 @@ update-calico:
 	@echo "✅ Updated $(CALICO_MANIFEST)"
 
 # Test targets
-GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
+GINKGO := go tool ginkgo
 TEST_PROCS ?= 3
 GINKGO_FOCUS ?=
 GINKGO_FOCUS_FLAG := $(if $(GINKGO_FOCUS),--focus="$(GINKGO_FOCUS)",)
