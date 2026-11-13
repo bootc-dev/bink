@@ -1,8 +1,10 @@
-FROM quay.io/fedora/fedora-bootc:44 AS builder
+ARG FEDORA_VERSION=45
+FROM quay.io/fedora/fedora-bootc:${FEDORA_VERSION} AS builder
 
+ARG FEDORA_VERSION
 ARG KUBE_MINOR=1.36
 RUN dnf -y install 'dnf5-command(copr)' && \
-    dnf -y copr enable rhcontainerbot/bootc fedora-44-x86_64
+    dnf -y copr enable rhcontainerbot/bootc fedora-${FEDORA_VERSION}-x86_64
 RUN /usr/libexec/bootc-base-imagectl build-rootfs \
     --manifest=minimal \
     --no-docs \

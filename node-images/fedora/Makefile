@@ -1,7 +1,7 @@
 .PHONY: build-bootc-image build-disk-image build-disk-image-composefs clean help
 
 KUBE_MINOR ?= 1.36
-FEDORA_VERSION ?= 44
+FEDORA_VERSION ?= 45
 DISK_SIZE ?= 10G
 BUILD_MEMORY ?= 4G
 BUILD_LOG_DIR ?= /tmp/bcvk-logs
@@ -22,6 +22,7 @@ build-bootc-image:
 		--cap-add=all \
 		--security-opt=label=disable \
 		--device /dev/fuse \
+		--build-arg FEDORA_VERSION=$(FEDORA_VERSION) \
 		--build-arg KUBE_MINOR=$(KUBE_MINOR) \
 		-t $(BOOTC_IMAGE) \
 		-f Containerfile \

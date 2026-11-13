@@ -64,7 +64,7 @@ jobs:
         id: set-matrix
         run: |
           DEFAULT="1.36"
-          FEDORA_VERSION="44"
+          FEDORA_VERSION="45"
           # TODO: check how to configure renovate to update this list automatically
           ALL='["1.37", "1.36", "1.35"]'
           NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
