@@ -84,7 +84,7 @@ func TestIsPodmanNotFound(t *testing.T) {
 		},
 		{
 			name: "wrapped not found",
-			err: fmt.Errorf("removing container: %w", &errorhandling.ErrorModel{
+			err: errors.Join(errors.New("removing container"), &errorhandling.ErrorModel{
 				ResponseCode: http.StatusNotFound,
 			}),
 			want: true,
