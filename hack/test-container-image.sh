@@ -58,10 +58,6 @@ run_test() {
                 fi
                 sleep 0.5
             done
-            # The outer container's resolv.conf points to the host's aardvark-dns, which is
-            # unreachable from inside nested podman networks. Override it so inner aardvark-dns
-            # forwards queries to a public resolver instead.
-            podman exec "${nested_container}" bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
             if podman exec "${nested_container}" test -d /cache; then
                 echo "Loading cached images into nested podman..."
                 podman exec "${nested_container}" bash -c 'for f in /cache/*.tar; do [ -f "$f" ] && podman load -i "$f"; done'
