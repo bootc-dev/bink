@@ -61,6 +61,9 @@ jobs:
       fedora-version: ${{ steps.set-matrix.outputs.fedora-version }}
       branch-tag: ${{ steps.set-matrix.outputs.branch-tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Get supported Kubernetes versions
         id: set-matrix
         run: |
