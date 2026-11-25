@@ -61,10 +61,13 @@ jobs:
       fedora-version: ${{ steps.set-matrix.outputs.fedora-version }}
       branch-tag: ${{ steps.set-matrix.outputs.branch-tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Get supported Kubernetes versions
         id: set-matrix
         run: |
-          DEFAULT="1.36"
+          DEFAULT=$(make -s -C node-images/fedora print-kube-minor)
           FEDORA_VERSION="45"
           # TODO: check how to configure renovate to update this list automatically
           ALL='["1.37", "1.36", "1.35"]'
