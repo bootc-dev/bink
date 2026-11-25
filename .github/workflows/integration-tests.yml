@@ -69,8 +69,8 @@ jobs:
         run: |
           DEFAULT=$(make -s -C node-images/fedora print-kube-minor)
           FEDORA_VERSION="45"
-          ALL=$(curl -s https://endoflife.date/api/kubernetes.json | \
-            jq -c '[.[] | select(.eol > (now | strftime("%Y-%m-%d"))) | .cycle][:3]')
+          # TODO: check how to configure renovate to update this list automatically
+          ALL='["1.37", "1.36", "1.35"]'
           NON_DEFAULT=$(echo "$ALL" | jq -c --arg default "$DEFAULT" 'map(select(. != $default))')
           # Construct the staging branch tag based on the branch name that is suitable for container image
           # tags. It converts all the character to lower cases, and replaces all non lower cases letter, numbers, '.'
